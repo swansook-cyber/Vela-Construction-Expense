@@ -394,6 +394,123 @@ function VendorModal({ onClose, onSaved }) {
 }
 
 
+function AttachDocumentModal({ expense, onClose, onSaved }) {
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [taskId, setTaskId] = useState('');
+  const [documentId, setDocumentId] = useState(expense.paperless_document_id || null);
+
+  async function waitForDocument(task) {
+    for (let i = 0; i < 20; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await api(`/documents/tasks/${encodeURIComponent(task)}`);
+      if (result.paperless_document_id) {
+        setDocumentId(result.paperless_document_id);
+        setMessage(`แนบเอกสารสำเร็จ — Paperless Document #${result.paperless_document_id}`);
+        await onSaved();
+        return;
+      }
+    }
+    setMessage('อัปโหลดสำเร็จแล้ว แต่ Paperless ยังประมวลผลอยู่ กรุณาเปิดรายการนี้ใหม่ภายหลังเพื่อตรวจสถานะ');
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!file) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const data = new FormData();
+      data.append('document', file);
+      data.append('title', `${expense.expense_no} - ${expense.description}`);
+      data.append('created', expense.expense_date);
+      data.append('expense_id', String(expense.id));
+
+      const response = await fetch('/api/v1/documents/upload', {
+        method: 'POST',
+        body: data,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || 'อัปโหลดเอกสารไม่สำเร็จ');
+
+      setTaskId(body.task_id);
+      setMessage('ส่งเอกสารเข้า Paperless แล้ว กำลังรอเลข Document…');
+      await onSaved();
+      await waitForDocument(body.task_id);
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function checkStatus() {
+    if (!taskId) return;
+    setBusy(true);
+    try {
+      const result = await api(`/documents/tasks/${encodeURIComponent(taskId)}`);
+      if (result.paperless_document_id) {
+        setDocumentId(result.paperless_document_id);
+        setMessage(`แนบเอกสารสำเร็จ — Paperless Document #${result.paperless_document_id}`);
+        await onSaved();
+      } else {
+        setMessage('Paperless ยังประมวลผลเอกสารอยู่');
+      }
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal small" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">Attach Document</p>
+            <h2>แนบเอกสาร</h2>
+            <p>{expense.expense_no} — {expense.description}</p>
+          </div>
+          <button className="ghost icon" onClick={onClose}>×</button>
+        </div>
+
+        <div className="attach-summary">
+          <span>วันที่ <b>{expense.expense_date}</b></span>
+          <span>ยอด <b>{money(expense.total_amount)}</b></span>
+          <span>เอกสารปัจจุบัน <b>{documentId ? `DOC #${documentId}` : 'ยังไม่มี'}</b></span>
+        </div>
+
+        <form className="attach-form" onSubmit={submit}>
+          <label>ไฟล์เอกสาร
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              required
+            />
+          </label>
+          <p className="footnote">รองรับ PDF, JPG, PNG, WEBP สูงสุด 20 MB ไฟล์จะเก็บใน Paperless-ngx</p>
+
+          {message && <div className="info-message">{message}</div>}
+
+          <div className="actions">
+            {taskId && !documentId && (
+              <button type="button" className="ghost" onClick={checkStatus} disabled={busy}>ตรวจสถานะ</button>
+            )}
+            <button type="button" className="ghost" onClick={onClose}>ปิด</button>
+            <button type="submit" disabled={!file || busy}>
+              {busy ? 'กำลังอัปโหลด…' : (documentId ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
 function DocumentPanel({ expenses, project, costCodes, vendors, onUpdated }) {
   const [configured, setConfigured] = useState(null);
   const [file, setFile] = useState(null);
@@ -797,6 +914,7 @@ function App() {
   const [showExpense, setShowExpense] = useState(false);
   const [showVendor, setShowVendor] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+  const [attachingExpense, setAttachingExpense] = useState(null);
   const [active, setActive] = useState('expenses');
   const [error, setError] = useState('');
 
@@ -895,6 +1013,9 @@ function App() {
                     <td>
                       <div className="row-actions">
                         <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}>แก้ไข</button>
+                        <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}>
+                          {e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}
+                        </button>
                         <button className="mini danger" disabled={e.payment_status === 'VOID'} onClick={() => voidExpense(e)}>ยกเลิก</button>
                       </div>
                     </td>
@@ -959,6 +1080,14 @@ function App() {
           onSaved={async () => { setEditingExpense(null); await loadBase(); }}
         />
       )}
+      {attachingExpense && (
+        <AttachDocumentModal
+          expense={attachingExpense}
+          onClose={() => setAttachingExpense(null)}
+          onSaved={loadBase}
+        />
+      )}
+
       {showVendor && (
         <VendorModal
           onClose={() => setShowVendor(false)}
