@@ -94,3 +94,18 @@ textarea { resize: vertical; }
   .upload-box, .task-box { align-items: stretch; flex-direction: column; }
   .upload-box button, .task-box button { width: 100%; }
 }
+
+.row-actions { display: flex; gap: 6px; white-space: nowrap; }
+.mini { padding: 7px 9px; border-radius: 9px; font-size: 11px; }
+.danger { background: #fff0ef; color: #9d3631; border: 1px solid #f0cbc8; }
+.danger:disabled { opacity: .45; }
+.report-total { margin-top: 14px; display: flex; justify-content: flex-end; align-items: center; gap: 18px; padding: 14px 4px 0; border-top: 1px solid #e7ecef; }
+.report-total span { color: #687781; font-size: 13px; }
+.report-total strong { font-size: 20px; }
+.upload-box select { min-width: 240px; }
+@media (max-width: 760px) {
+  .row-actions { flex-direction: column; }
+  .mini { width: 100%; }
+  .report-total { justify-content: space-between; }
+  .upload-box select { min-width: 0; }
+}
