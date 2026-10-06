@@ -1,12 +1,13 @@
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.entities import CostCode, Expense, Project, Vendor
+from app.services.paperless import PaperlessClient
 from app.schemas.entities import (
     CostCodeOut,
     DashboardSummary,
@@ -163,3 +164,57 @@ def dashboard(project_id: int, db: Session = Depends(get_db)):
         expense_count=len(expenses),
         unpaid_count=unpaid_count,
     )
+
+
+@router.get("/documents/status")
+def document_status():
+    client = PaperlessClient()
+    return {"configured": client.configured}
+
+
+@router.post("/documents/upload")
+async def upload_document(
+    document: UploadFile = File(...),
+    title: str | None = Form(default=None),
+    created: str | None = Form(default=None),
+):
+    client = PaperlessClient()
+    if not client.configured:
+        raise HTTPException(status_code=503, detail="Paperless-ngx is not configured")
+
+    allowed = {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }
+    if document.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="รองรับเฉพาะ PDF, JPG, PNG และ WEBP")
+
+    content = await document.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="ไฟล์ต้องไม่เกิน 20 MB")
+
+    try:
+        task_id = await client.upload_document(
+            filename=document.filename or "document",
+            content=content,
+            content_type=document.content_type or "application/octet-stream",
+            title=title,
+            created=created,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Paperless upload failed: {exc}") from exc
+
+    return {"task_id": task_id, "status": "QUEUED"}
+
+
+@router.get("/documents/tasks/{task_id}")
+async def document_task(task_id: str):
+    client = PaperlessClient()
+    if not client.configured:
+        raise HTTPException(status_code=503, detail="Paperless-ngx is not configured")
+    try:
+        return await client.get_task(task_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Paperless task lookup failed: {exc}") from exc
