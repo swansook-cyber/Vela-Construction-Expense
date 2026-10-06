@@ -8,6 +8,7 @@ THAI_COMPANY_MARKERS = ("บริษัท", "หจก.", "ห้างหุ�
 TOTAL_LABELS = ("ยอดรวม", "รวมทั้งสิ้น", "จำนวนเงินรวม", "grand total", "total")
 SUBTOTAL_LABELS = ("ก่อน vat", "มูลค่าสินค้า", "subtotal", "ก่อนภาษี")
 VAT_LABELS = ("vat", "ภาษีมูลค่าเพิ่ม")
+BAD_DOCUMENT_TOKENS = {"copy", "original", "customer", "taxinvoice", "invoice"}
 
 
 def _clean_line(value: str) -> str:
@@ -22,14 +23,26 @@ def _money(value: str) -> str | None:
         return None
 
 
+def _looks_like_money_token(token: str, line: str) -> bool:
+    normalized = token.replace(",", "")
+    # Reject obvious percentages / isolated single-digit noise such as "5" from "VAT 5%".
+    if re.search(rf"{re.escape(token)}\s*%", line):
+        return False
+    if "." in normalized:
+        return True
+    digits = re.sub(r"\D", "", normalized)
+    return len(digits) >= 3
+
+
 def _find_amount_near(lines: list[str], labels: tuple[str, ...]) -> str | None:
     amount_re = re.compile(r"(?<!\d)(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})|\d+(?:\.\d{1,2}))(?!\d)")
     for line in reversed(lines):
         low = line.lower()
         if any(label in low for label in labels):
             values = amount_re.findall(line)
-            if values:
-                return _money(values[-1])
+            for value in reversed(values):
+                if _looks_like_money_token(value, line):
+                    return _money(value)
     return None
 
 
@@ -53,12 +66,30 @@ def _parse_date(text: str) -> str | None:
 
 
 def _vendor_candidate(lines: list[str]) -> str | None:
-    for line in lines[:20]:
+    # Be conservative: only suggest lines that actually look like a business name.
+    for line in lines[:25]:
         if any(marker in line for marker in THAI_COMPANY_MARKERS):
-            return line[:255]
-    for line in lines[:12]:
-        if 5 <= len(line) <= 120 and not re.fullmatch(r"[\W\d_]+", line):
-            return line[:255]
+            if 6 <= len(line) <= 160:
+                return line[:255]
+    return None
+
+
+def _document_candidate(compact: str) -> str | None:
+    doc_patterns = [
+        r"(?:เลขที่|เลขที่เอกสาร|invoice\s*(?:no\.?|#)?|inv\.?\s*(?:no\.?)?)\s*[:#]?\s*([A-Z0-9][A-Z0-9/_-]{2,})",
+        r"(?:ใบกำกับภาษี|ใบส่งของ)\s*(?:เลขที่)?\s*[:#]?\s*([A-Z0-9][A-Z0-9/_-]{3,})",
+    ]
+    for pattern in doc_patterns:
+        match = re.search(pattern, compact, flags=re.IGNORECASE)
+        if not match:
+            continue
+        candidate = match.group(1).strip().strip("-_/")
+        if candidate.lower().replace(" ", "") in BAD_DOCUMENT_TOKENS:
+            continue
+        # Require at least one digit; avoids OCR words like COPY.
+        if not re.search(r"\d", candidate):
+            continue
+        return candidate[:100]
     return None
 
 
@@ -70,35 +101,32 @@ def analyze_ocr_document(document: dict[str, Any]) -> dict[str, Any]:
     tax_id_match = re.search(r"(?<!\d)(\d{13})(?!\d)", compact)
     tax_id = tax_id_match.group(1) if tax_id_match else None
 
-    document_no = None
-    doc_patterns = [
-        r"(?:เลขที่|เลขที่เอกสาร|invoice\s*(?:no\.?|#)?|inv\.?\s*(?:no\.?)?)\s*[:#]?\s*([A-Z0-9][A-Z0-9/_-]{2,})",
-        r"(?:ใบกำกับภาษี|ใบส่งของ).*?([A-Z0-9][A-Z0-9/_-]{3,})",
-    ]
-    for pattern in doc_patterns:
-        match = re.search(pattern, compact, flags=re.IGNORECASE)
-        if match:
-            document_no = match.group(1)[:100]
-            break
-
+    vendor_name = _vendor_candidate(lines)
+    document_no = _document_candidate(compact)
     subtotal = _find_amount_near(lines, SUBTOTAL_LABELS)
     vat = _find_amount_near(lines, VAT_LABELS)
     total = _find_amount_near(lines, TOTAL_LABELS)
 
     confidence_notes: list[str] = []
+    if not vendor_name:
+        confidence_notes.append("ไม่พบชื่อผู้ขายที่มั่นใจ")
     if not total:
         confidence_notes.append("ไม่พบยอดรวมที่มั่นใจ")
     if not tax_id:
         confidence_notes.append("ไม่พบเลขผู้เสียภาษี 13 หลัก")
     if not document_no:
         confidence_notes.append("ไม่พบเลขที่เอกสารที่มั่นใจ")
+    if not subtotal:
+        confidence_notes.append("ไม่พบยอดก่อน VAT ที่มั่นใจ")
+    if not vat:
+        confidence_notes.append("ไม่พบยอด VAT ที่มั่นใจ")
 
     return {
         "paperless_document_id": document.get("id"),
         "title": document.get("title"),
         "created": document.get("created"),
         "suggested": {
-            "vendor_name": _vendor_candidate(lines),
+            "vendor_name": vendor_name,
             "tax_id": tax_id,
             "expense_date": _parse_date(content),
             "document_no": document_no,
