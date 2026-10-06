@@ -141,7 +141,17 @@ def dashboard(project_id: int, db: Session = Depends(get_db)):
 
     total = sum((Decimal(e.total_amount or 0) for e in expenses), Decimal("0"))
     paid = sum((Decimal(e.net_paid or 0) for e in expenses), Decimal("0"))
-    outstanding = max(total - paid, Decimal("0"))
+    vendor_payable = sum(
+        (
+            max(
+                Decimal(e.total_amount or 0) - Decimal(e.withholding_tax or 0),
+                Decimal("0"),
+            )
+            for e in expenses
+        ),
+        Decimal("0"),
+    )
+    outstanding = max(vendor_payable - paid, Decimal("0"))
     unpaid_count = sum(1 for e in expenses if e.payment_status in {"UNPAID", "PARTIAL"})
 
     return DashboardSummary(
