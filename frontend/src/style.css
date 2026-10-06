@@ -134,3 +134,13 @@ textarea { resize: vertical; }
   .quick-modal { padding: 16px; }
   .quick-summary { grid-template-columns: 1fr; }
 }
+
+.attach-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.attach-summary span { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid #e4eaed; border-radius: 12px; color: #6b7982; font-size: 12px; }
+.attach-summary b { color: #17212b; font-size: 14px; }
+.attach-form { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 760px) {
+  .attach-summary { grid-template-columns: 1fr; }
+  .attach-form .actions { flex-direction: column-reverse; }
+  .attach-form .actions button { width: 100%; }
+}
