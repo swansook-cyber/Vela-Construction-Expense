@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.entities import AuditLog, CostCode, Expense, Project, Vendor
 from app.services.paperless import PaperlessClient
+from app.services.ocr_review import analyze_ocr_document
 from app.schemas.entities import (
     AuditLogOut,
     CostCodeOut,
@@ -563,3 +564,15 @@ async def document_task(task_id: str, db: Session = Depends(get_db)):
         "linked_expense_id": linked_expense.id if linked_expense else None,
         "paperless_document_id": document_id,
     }
+
+
+@router.get("/documents/{document_id}/review")
+async def review_document(document_id: int):
+    client = PaperlessClient()
+    if not client.configured:
+        raise HTTPException(status_code=503, detail="Paperless-ngx is not configured")
+    try:
+        document = await client.get_document(document_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Paperless document lookup failed: {exc}") from exc
+    return analyze_ocr_document(document)
