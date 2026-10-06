@@ -240,6 +240,101 @@ function VendorModal({ onClose, onSaved }) {
   );
 }
 
+
+function DocumentPanel() {
+  const [configured, setConfigured] = useState(null);
+  const [file, setFile] = useState(null);
+  const [taskId, setTaskId] = useState('');
+  const [taskData, setTaskData] = useState(null);
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api('/documents/status')
+      .then((r) => setConfigured(r.configured))
+      .catch(() => setConfigured(false));
+  }, []);
+
+  async function upload(e) {
+    e.preventDefault();
+    if (!file) return;
+    setBusy(true);
+    setMessage('');
+    setTaskData(null);
+    try {
+      const data = new FormData();
+      data.append('document', file);
+      data.append('title', file.name);
+      const response = await fetch('/api/v1/documents/upload', { method: 'POST', body: data });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || 'อัปโหลดเอกสารไม่สำเร็จ');
+      setTaskId(body.task_id);
+      setMessage('ส่งเอกสารเข้า OCR แล้ว');
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function checkTask() {
+    if (!taskId) return;
+    setBusy(true);
+    try {
+      const result = await api(`/documents/tasks/${encodeURIComponent(taskId)}`);
+      setTaskData(result);
+      setMessage('อัปเดตสถานะ OCR แล้ว');
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (configured === null) return <section className="panel"><p>กำลังตรวจสอบ Paperless-ngx…</p></section>;
+
+  if (!configured) {
+    return (
+      <section className="panel document-panel">
+        <div className="section-head">
+          <div><h2>เอกสาร / OCR</h2><p>Paperless-ngx document engine</p></div>
+          <span className="status unpaid">ยังไม่เชื่อมต่อ</span>
+        </div>
+        <div className="setup-note">
+          <strong>Document module พร้อมแล้ว แต่ยังต้องตั้งค่า Paperless-ngx</strong>
+          <p>กำหนด PAPERLESS_URL และ PAPERLESS_TOKEN ในไฟล์ .env ของ server แล้ว restart stack จากนั้นหน้านี้จะเปิดรับ PDF/JPG/PNG/WEBP โดยอัตโนมัติ</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel document-panel">
+      <div className="section-head">
+        <div><h2>เอกสาร / OCR</h2><p>ส่งใบเสร็จ ใบกำกับภาษี และ Invoice เข้า Paperless-ngx</p></div>
+        <span className="status paid">เชื่อมต่อแล้ว</span>
+      </div>
+      <form className="upload-box" onSubmit={upload}>
+        <input
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+        />
+        <button type="submit" disabled={!file || busy}>{busy ? 'กำลังทำงาน…' : 'อัปโหลดเข้า OCR'}</button>
+      </form>
+      {message && <div className="info-message">{message}</div>}
+      {taskId && (
+        <div className="task-box">
+          <div><span>OCR Task</span><code>{taskId}</code></div>
+          <button className="ghost" onClick={checkTask} disabled={busy}>ตรวจสถานะ OCR</button>
+        </div>
+      )}
+      {taskData && <pre className="task-json">{JSON.stringify(taskData, null, 2)}</pre>}
+      <p className="footnote">ไฟล์ต้นฉบับจะเก็บโดย Paperless-ngx ส่วนข้อมูลค่าใช้จ่ายยังเก็บใน Vela Construction Expense แยกกัน</p>
+    </section>
+  );
+}
+
 function App() {
   const [projects, setProjects] = useState([]);
   const [costCodes, setCostCodes] = useState([]);
@@ -302,6 +397,7 @@ function App() {
       <nav className="tabs">
         <button className={active === 'expenses' ? 'active' : ''} onClick={() => setActive('expenses')}>ค่าใช้จ่าย</button>
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
+        <button className={active === 'documents' ? 'active' : ''} onClick={() => setActive('documents')}>เอกสาร / OCR</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
       </nav>
 
@@ -351,6 +447,8 @@ function App() {
           </div>
         </section>
       )}
+
+      {active === 'documents' && <DocumentPanel />}
 
       {active === 'codes' && (
         <section className="panel">
