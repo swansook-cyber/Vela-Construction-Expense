@@ -76,7 +76,7 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
           payment_status: form.payment_status,
           payment_method: form.payment_method || null,
           notes: form.notes || null,
-          paperless_document_id: null,
+          paperless_document_id: existing?.paperless_document_id || null,
         }),
       });
       onSaved();
