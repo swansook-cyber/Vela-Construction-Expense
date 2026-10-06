@@ -60,9 +60,25 @@ class Expense(Base):
     payment_status: Mapped[str] = mapped_column(String(30), default="UNPAID")
     payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
     paperless_document_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    document_task_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    void_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     project = relationship("Project")
     cost_code = relationship("CostCode")
     vendor = relationship("Vendor")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(50), index=True)
+    entity_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(50), index=True)
+    actor: Mapped[str] = mapped_column(String(100), default="system")
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
