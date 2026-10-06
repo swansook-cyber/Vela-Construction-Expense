@@ -244,7 +244,7 @@ function VendorModal({ onClose, onSaved }) {
 }
 
 
-function DocumentPanel({ expenses, onUpdated }) {
+function DocumentPanel({ expenses, project, costCodes, vendors, onUpdated }) {
   const [configured, setConfigured] = useState(null);
   const [file, setFile] = useState(null);
   const [taskId, setTaskId] = useState('');
@@ -252,6 +252,8 @@ function DocumentPanel({ expenses, onUpdated }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [expenseId, setExpenseId] = useState('');
+  const [review, setReview] = useState(null);
+  const [reviewForm, setReviewForm] = useState(null);
 
   useEffect(() => {
     api('/documents/status')
@@ -265,6 +267,8 @@ function DocumentPanel({ expenses, onUpdated }) {
     setBusy(true);
     setMessage('');
     setTaskData(null);
+    setReview(null);
+    setReviewForm(null);
     try {
       const data = new FormData();
       data.append('document', file);
@@ -283,13 +287,119 @@ function DocumentPanel({ expenses, onUpdated }) {
     }
   }
 
+  function prepareReview(data) {
+    const suggested = data.suggested || {};
+    const matchedVendor = vendors.find((v) =>
+      (suggested.tax_id && v.tax_id === suggested.tax_id) ||
+      (suggested.vendor_name && v.name.trim().toLowerCase() === suggested.vendor_name.trim().toLowerCase())
+    );
+    const subtotal = Number(suggested.subtotal || 0);
+    const vat = Number(suggested.vat_amount || 0);
+    const total = Number(suggested.total_amount || 0);
+    setReview(data);
+    setReviewForm({
+      vendor_id: matchedVendor?.id || '',
+      vendor_name: suggested.vendor_name || '',
+      tax_id: suggested.tax_id || '',
+      expense_date: suggested.expense_date || today(),
+      document_no: suggested.document_no || '',
+      description: suggested.vendor_name ? `ซื้อสินค้า/บริการ — ${suggested.vendor_name}` : '',
+      cost_code_id: '',
+      subtotal: subtotal || (total && vat ? Math.max(total - vat, 0) : ''),
+      vat_amount: vat || '',
+      total_amount: total || (subtotal ? subtotal + vat : ''),
+      withholding_tax: '0',
+      payment_status: 'UNPAID',
+      payment_method: '',
+      notes: 'สร้างจาก OCR Review — โปรดตรวจสอบกับเอกสารต้นฉบับ',
+    });
+  }
+
+  async function loadReview(documentId) {
+    const data = await api(`/documents/${documentId}/review`);
+    prepareReview(data);
+    setMessage('OCR เสร็จแล้ว — กรุณาตรวจข้อมูลก่อนบันทึก');
+  }
+
   async function checkTask() {
     if (!taskId) return;
     setBusy(true);
     try {
       const result = await api(`/documents/tasks/${encodeURIComponent(taskId)}`);
       setTaskData(result);
-      setMessage('อัปเดตสถานะ OCR แล้ว');
+      if (result.paperless_document_id) {
+        await loadReview(result.paperless_document_id);
+      } else {
+        setMessage('OCR ยังประมวลผลอยู่ หรือยังไม่พบ Document ID');
+      }
+      if (onUpdated) onUpdated();
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const setReviewField = (key, value) => setReviewForm((form) => ({ ...form, [key]: value }));
+
+  async function createExpenseFromReview(e) {
+    e.preventDefault();
+    if (!reviewForm || !review?.paperless_document_id || !project?.id) return;
+    if (!reviewForm.cost_code_id) {
+      setMessage('กรุณาเลือก Cost Code ก่อนบันทึก');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      let vendorId = reviewForm.vendor_id ? Number(reviewForm.vendor_id) : null;
+      if (!vendorId && reviewForm.vendor_name.trim()) {
+        const created = await api('/vendors', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: reviewForm.vendor_name.trim(),
+            tax_id: reviewForm.tax_id.trim() || null,
+            phone: null,
+            address: null,
+            notes: 'สร้างจาก OCR Review',
+          }),
+        });
+        vendorId = created.id;
+      }
+
+      const subtotal = Number(reviewForm.subtotal || 0);
+      const vat = Number(reviewForm.vat_amount || 0);
+      const total = Number(reviewForm.total_amount || (subtotal + vat));
+      const wht = Number(reviewForm.withholding_tax || 0);
+
+      await api('/expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          project_id: Number(project.id),
+          cost_code_id: Number(reviewForm.cost_code_id),
+          vendor_id: vendorId,
+          expense_date: reviewForm.expense_date,
+          document_no: reviewForm.document_no.trim() || null,
+          description: reviewForm.description.trim() || 'ค่าใช้จ่ายจากเอกสาร OCR',
+          subtotal: subtotal.toFixed(2),
+          vat_amount: vat.toFixed(2),
+          withholding_tax: wht.toFixed(2),
+          total_amount: total.toFixed(2),
+          net_paid: '0.00',
+          payment_status: reviewForm.payment_status,
+          payment_method: reviewForm.payment_method || null,
+          paperless_document_id: Number(review.paperless_document_id),
+          notes: reviewForm.notes.trim() || null,
+        }),
+      });
+
+      setMessage('บันทึกค่าใช้จ่ายจาก OCR สำเร็จ');
+      setReview(null);
+      setReviewForm(null);
+      setTaskId('');
+      setTaskData(null);
+      setFile(null);
+      if (onUpdated) await onUpdated();
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -308,7 +418,7 @@ function DocumentPanel({ expenses, onUpdated }) {
         </div>
         <div className="setup-note">
           <strong>Document module พร้อมแล้ว แต่ยังต้องตั้งค่า Paperless-ngx</strong>
-          <p>กำหนด PAPERLESS_URL และ PAPERLESS_TOKEN ในไฟล์ .env ของ server แล้ว restart stack จากนั้นหน้านี้จะเปิดรับ PDF/JPG/PNG/WEBP โดยอัตโนมัติ</p>
+          <p>กำหนด PAPERLESS_URL และ PAPERLESS_TOKEN ในไฟล์ .env ของ server แล้ว recreate backend</p>
         </div>
       </section>
     );
@@ -317,12 +427,13 @@ function DocumentPanel({ expenses, onUpdated }) {
   return (
     <section className="panel document-panel">
       <div className="section-head">
-        <div><h2>เอกสาร / OCR</h2><p>ส่งใบเสร็จ ใบกำกับภาษี และ Invoice เข้า Paperless-ngx</p></div>
+        <div><h2>เอกสาร / OCR</h2><p>อัปโหลด → OCR → ตรวจข้อมูล → สร้างค่าใช้จ่าย</p></div>
         <span className="status paid">เชื่อมต่อแล้ว</span>
       </div>
+
       <form className="upload-box" onSubmit={upload}>
         <select value={expenseId} onChange={(e) => setExpenseId(e.target.value)}>
-          <option value="">เอกสารทั่วไป — ยังไม่ผูกค่าใช้จ่าย</option>
+          <option value="">เอกสารใหม่ — สร้างค่าใช้จ่ายหลัง OCR</option>
           {expenses.filter((e) => e.payment_status !== 'VOID').map((e) => (
             <option key={e.id} value={e.id}>{e.expense_no} — {e.description}</option>
           ))}
@@ -334,15 +445,117 @@ function DocumentPanel({ expenses, onUpdated }) {
         />
         <button type="submit" disabled={!file || busy}>{busy ? 'กำลังทำงาน…' : 'อัปโหลดเข้า OCR'}</button>
       </form>
+
       {message && <div className="info-message">{message}</div>}
+
       {taskId && (
         <div className="task-box">
           <div><span>OCR Task</span><code>{taskId}</code></div>
-          <button className="ghost" onClick={checkTask} disabled={busy}>ตรวจสถานะ OCR</button>
+          <button className="ghost" onClick={checkTask} disabled={busy}>
+            {busy ? 'กำลังตรวจ…' : 'ตรวจสถานะ OCR'}
+          </button>
         </div>
       )}
-      {taskData && <pre className="task-json">{JSON.stringify(taskData, null, 2)}</pre>}
-      <p className="footnote">ไฟล์ต้นฉบับจะเก็บโดย Paperless-ngx ส่วนข้อมูลค่าใช้จ่ายยังเก็บใน Vela Construction Expense แยกกัน</p>
+
+      {review && reviewForm && (
+        <div className="ocr-review">
+          <div className="review-title">
+            <div>
+              <p className="eyebrow">OCR Review</p>
+              <h3>ตรวจข้อมูลก่อนสร้างค่าใช้จ่าย</h3>
+            </div>
+            <span className="status partial">ต้องตรวจสอบ</span>
+          </div>
+
+          {review.confidence_notes?.length > 0 && (
+            <div className="review-warning">
+              {review.confidence_notes.map((note) => <div key={note}>• {note}</div>)}
+            </div>
+          )}
+
+          <form className="form-grid review-form" onSubmit={createExpenseFromReview}>
+            <label>ผู้ขายเดิม
+              <select value={reviewForm.vendor_id} onChange={(e) => setReviewField('vendor_id', e.target.value)}>
+                <option value="">ยังไม่เลือก — สร้างจากชื่อ OCR</option>
+                {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </label>
+            <label>ชื่อผู้ขายจาก OCR
+              <input value={reviewForm.vendor_name} onChange={(e) => setReviewField('vendor_name', e.target.value)} />
+            </label>
+            <label>เลขผู้เสียภาษี
+              <input value={reviewForm.tax_id} onChange={(e) => setReviewField('tax_id', e.target.value)} inputMode="numeric" />
+            </label>
+            <label>วันที่เอกสาร
+              <input type="date" value={reviewForm.expense_date} onChange={(e) => setReviewField('expense_date', e.target.value)} required />
+            </label>
+            <label>เลขที่เอกสาร
+              <input value={reviewForm.document_no} onChange={(e) => setReviewField('document_no', e.target.value)} />
+            </label>
+            <label>Cost Code *
+              <select value={reviewForm.cost_code_id} onChange={(e) => setReviewField('cost_code_id', e.target.value)} required>
+                <option value="">เลือกหมวดงาน</option>
+                {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+              </select>
+            </label>
+            <label className="wide">รายละเอียด
+              <input value={reviewForm.description} onChange={(e) => setReviewField('description', e.target.value)} required />
+            </label>
+            <label>ก่อน VAT
+              <input type="number" min="0" step="0.01" value={reviewForm.subtotal} onChange={(e) => setReviewField('subtotal', e.target.value)} />
+            </label>
+            <label>VAT
+              <input type="number" min="0" step="0.01" value={reviewForm.vat_amount} onChange={(e) => setReviewField('vat_amount', e.target.value)} />
+            </label>
+            <label>ยอดรวมเอกสาร
+              <input type="number" min="0" step="0.01" value={reviewForm.total_amount} onChange={(e) => setReviewField('total_amount', e.target.value)} required />
+            </label>
+            <label>หัก ณ ที่จ่าย
+              <input type="number" min="0" step="0.01" value={reviewForm.withholding_tax} onChange={(e) => setReviewField('withholding_tax', e.target.value)} />
+            </label>
+            <label>สถานะจ่าย
+              <select value={reviewForm.payment_status} onChange={(e) => setReviewField('payment_status', e.target.value)}>
+                <option value="UNPAID">ยังไม่จ่าย</option>
+                <option value="PAID">จ่ายแล้ว (ให้ไปอัปเดตยอดจ่ายใน Expense)</option>
+              </select>
+            </label>
+            <label>วิธีจ่าย
+              <select value={reviewForm.payment_method} onChange={(e) => setReviewField('payment_method', e.target.value)}>
+                <option value="">ไม่ระบุ</option>
+                <option value="TRANSFER">โอน</option>
+                <option value="CASH">เงินสด</option>
+                <option value="CREDIT">เครดิต / เจ้าหนี้</option>
+                <option value="CHEQUE">เช็ค</option>
+              </select>
+            </label>
+            <label className="wide">หมายเหตุ
+              <textarea rows="2" value={reviewForm.notes} onChange={(e) => setReviewField('notes', e.target.value)} />
+            </label>
+
+            <div className="review-confirm wide">
+              <div>
+                <strong>Paperless Document #{review.paperless_document_id}</strong>
+                <p>OCR เป็นเพียงข้อเสนอ ระบบจะไม่บันทึกจนกดปุ่มยืนยัน</p>
+              </div>
+              <button type="submit" disabled={busy}>{busy ? 'กำลังบันทึก…' : 'ยืนยันและสร้างค่าใช้จ่าย'}</button>
+            </div>
+          </form>
+
+          <details className="ocr-text">
+            <summary>ดูข้อความ OCR ต้นฉบับ</summary>
+            <pre>{review.ocr_text || 'ไม่มีข้อความ OCR'}</pre>
+          </details>
+        </div>
+      )}
+
+      {taskData && !review && (
+        <details className="task-debug">
+          <summary>รายละเอียด OCR Task</summary>
+          <pre className="task-json">{JSON.stringify(taskData, null, 2)}</pre>
+        </details>
+      )}
+
+      <p className="footnote">ไฟล์ต้นฉบับเก็บใน Paperless-ngx และค่าใช้จ่ายเก็บใน Vela Construction Expense แยกกัน</p>
     </section>
   );
 }
@@ -563,7 +776,7 @@ function App() {
         </section>
       )}
 
-      {active === 'documents' && <DocumentPanel expenses={expenses} onUpdated={loadBase} />}
+      {active === 'documents' && <DocumentPanel expenses={expenses} project={project} costCodes={costCodes} vendors={vendors} onUpdated={loadBase} />}
 
       {active === 'reports' && <ReportPanel project={project} />}
       {active === 'audit' && <AuditPanel />}
