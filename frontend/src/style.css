@@ -127,3 +127,10 @@ textarea { resize: vertical; }
   .tabs { scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
 }
+
+.quick-modal { width: min(720px, 100%); }
+.quick-summary { background: #f2f6f7; }
+@media (max-width: 760px) {
+  .quick-modal { padding: 16px; }
+  .quick-summary { grid-template-columns: 1fr; }
+}
