@@ -16,7 +16,7 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://velaexpense:change_me@db:5432/vela_construction_expense}
-      PAPERLESS_URL: ${PAPERLESS_URL:-}
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://paperless-webserver:8000}
       PAPERLESS_TOKEN: ${PAPERLESS_TOKEN:-}
     depends_on:
       - db
@@ -31,5 +31,51 @@ services:
     ports:
       - "8097:80"
 
+  paperless-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD:-change_me_paperless}
+    volumes:
+      - paperless_db:/var/lib/postgresql/data
+
+  paperless-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - paperless_redis:/data
+
+  paperless-webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - paperless-db
+      - paperless-redis
+    environment:
+      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: ${PAPERLESS_DB_PASSWORD:-change_me_paperless}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:-change_me_paperless_secret}
+      PAPERLESS_TIME_ZONE: Asia/Bangkok
+      PAPERLESS_OCR_LANGUAGES: tha
+      PAPERLESS_OCR_LANGUAGE: tha+eng
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+      - paperless_consume:/usr/src/paperless/consume
+      - paperless_export:/usr/src/paperless/export
+    ports:
+      - "8099:8000"
+
 volumes:
   vela_construction_expense_db:
+  paperless_db:
+  paperless_redis:
+  paperless_data:
+  paperless_media:
+  paperless_consume:
+  paperless_export:
