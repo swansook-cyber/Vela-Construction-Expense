@@ -20,6 +20,156 @@ const money = (value) =>
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    project_id: projects[0]?.id || '',
+    cost_code_id: '',
+    vendor_id: '',
+    expense_date: today(),
+    document_no: '',
+    description: '',
+    total_amount: '',
+    vatMode: 'NO_VAT',
+    whtRate: '0',
+    payment_status: 'UNPAID',
+    payment_method: '',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const total = Number(form.total_amount || 0);
+  const subtotal = form.vatMode === 'VAT_INCLUDED' ? total / 1.07 : total;
+  const vat = form.vatMode === 'VAT_INCLUDED' ? total - subtotal : 0;
+  const wht = subtotal * Number(form.whtRate || 0) / 100;
+  const vendorPayable = Math.max(total - wht, 0);
+
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const netPaid = form.payment_status === 'PAID' ? vendorPayable : 0;
+      await api('/expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          project_id: Number(form.project_id),
+          cost_code_id: Number(form.cost_code_id),
+          vendor_id: form.vendor_id ? Number(form.vendor_id) : null,
+          expense_date: form.expense_date,
+          document_no: form.document_no || null,
+          description: form.description,
+          subtotal: subtotal.toFixed(2),
+          vat_amount: vat.toFixed(2),
+          withholding_tax: wht.toFixed(2),
+          total_amount: total.toFixed(2),
+          net_paid: netPaid.toFixed(2),
+          payment_status: form.payment_status,
+          payment_method: form.payment_method || null,
+          notes: form.notes || null,
+          paperless_document_id: null,
+        }),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal quick-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">Quick Expense Entry</p>
+            <h2>บันทึกค่าใช้จ่ายแบบเร็ว</h2>
+            <p>กรอกจากเอกสารจริง แล้วค่อยแนบเอกสารภายหลังได้</p>
+          </div>
+          <button className="ghost icon" onClick={onClose}>×</button>
+        </div>
+
+        <form onSubmit={submit} className="form-grid">
+          <label>วันที่
+            <input type="date" value={form.expense_date} onChange={(e) => set('expense_date', e.target.value)} required />
+          </label>
+          <label>ผู้ขาย / ผู้รับเหมา
+            <select value={form.vendor_id} onChange={(e) => set('vendor_id', e.target.value)}>
+              <option value="">ไม่ระบุ</option>
+              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </label>
+          <label>Cost Code *
+            <select value={form.cost_code_id} onChange={(e) => set('cost_code_id', e.target.value)} required>
+              <option value="">เลือกหมวดงาน</option>
+              {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+            </select>
+          </label>
+          <label>เลขที่เอกสาร
+            <input value={form.document_no} onChange={(e) => set('document_no', e.target.value)} placeholder="Invoice / Receipt No." />
+          </label>
+          <label className="wide">รายละเอียด *
+            <input value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="เช่น ค่าปูน / ค่าแรง / อุปกรณ์ไฟฟ้า" required />
+          </label>
+          <label>ยอดรวมเอกสาร *
+            <input type="number" inputMode="decimal" min="0" step="0.01" value={form.total_amount} onChange={(e) => set('total_amount', e.target.value)} required />
+          </label>
+          <label>VAT
+            <select value={form.vatMode} onChange={(e) => set('vatMode', e.target.value)}>
+              <option value="NO_VAT">ไม่มี VAT / ไม่แยก VAT</option>
+              <option value="VAT_INCLUDED">ยอดนี้รวม VAT 7% แล้ว</option>
+            </select>
+          </label>
+          <label>หัก ณ ที่จ่าย
+            <select value={form.whtRate} onChange={(e) => set('whtRate', e.target.value)}>
+              <option value="0">ไม่หัก</option>
+              <option value="1">1%</option>
+              <option value="3">3%</option>
+              <option value="5">5%</option>
+            </select>
+          </label>
+          <label>สถานะการจ่าย
+            <select value={form.payment_status} onChange={(e) => set('payment_status', e.target.value)}>
+              <option value="UNPAID">ยังไม่จ่าย</option>
+              <option value="PAID">จ่ายแล้ว</option>
+            </select>
+          </label>
+          <label>วิธีจ่าย
+            <select value={form.payment_method} onChange={(e) => set('payment_method', e.target.value)}>
+              <option value="">ไม่ระบุ</option>
+              <option value="TRANSFER">โอน</option>
+              <option value="CASH">เงินสด</option>
+              <option value="CREDIT">เครดิต / เจ้าหนี้</option>
+              <option value="CHEQUE">เช็ค</option>
+            </select>
+          </label>
+
+          <div className="calc wide quick-summary">
+            <span>ก่อน VAT <b>{money(subtotal)}</b></span>
+            <span>VAT <b>{money(vat)}</b></span>
+            <span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span>
+            <span className="total-line">ยอดเอกสาร <b>{money(total)}</b></span>
+            <span>จ่ายผู้ขายสุทธิ <b>{money(vendorPayable)}</b></span>
+          </div>
+
+          <label className="wide">หมายเหตุ
+            <textarea rows="2" value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+          </label>
+
+          {error && <div className="error wide">{error}</div>}
+          <div className="actions wide">
+            <button type="button" className="ghost" onClick={onClose}>ยกเลิก</button>
+            <button type="submit" disabled={saving}>{saving ? 'กำลังบันทึก…' : 'บันทึกค่าใช้จ่าย'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, onSaved }) {
   const existingSubtotal = Number(existing?.subtotal || 0);
   const existingVatRate = existingSubtotal > 0 ? String(Math.round(Number(existing?.vat_amount || 0) / existingSubtotal * 100)) : '7';
@@ -427,7 +577,7 @@ function DocumentPanel({ expenses, project, costCodes, vendors, onUpdated }) {
   return (
     <section className="panel document-panel">
       <div className="section-head">
-        <div><h2>เอกสาร / OCR</h2><p>อัปโหลด → OCR → ตรวจข้อมูล → สร้างค่าใช้จ่าย</p></div>
+        <div><h2>เอกสาร</h2><p>เก็บไฟล์ต้นฉบับใน Paperless-ngx และผูกกับค่าใช้จ่ายเมื่อจำเป็น</p></div>
         <span className="status paid">เชื่อมต่อแล้ว</span>
       </div>
 
@@ -715,7 +865,7 @@ function App() {
       <nav className="tabs">
         <button className={active === 'expenses' ? 'active' : ''} onClick={() => setActive('expenses')}>ค่าใช้จ่าย</button>
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
-        <button className={active === 'documents' ? 'active' : ''} onClick={() => setActive('documents')}>เอกสาร / OCR</button>
+        <button className={active === 'documents' ? 'active' : ''} onClick={() => setActive('documents')}>เอกสาร</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
         <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
         <button className={active === 'audit' ? 'active' : ''} onClick={() => setActive('audit')}>Audit Log</button>
@@ -790,7 +940,7 @@ function App() {
       )}
 
       {showExpense && (
-        <ExpenseModal
+        <QuickExpenseModal
           projects={projects}
           costCodes={costCodes}
           vendors={vendors}
