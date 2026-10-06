@@ -25,12 +25,17 @@ def _money(value: str) -> str | None:
 
 def _looks_like_money_token(token: str, line: str) -> bool:
     normalized = token.replace(",", "")
-    # Reject obvious percentages / isolated single-digit noise such as "5" from "VAT 5%".
     if re.search(rf"{re.escape(token)}\s*%", line):
         return False
-    if "." in normalized:
-        return True
+
     digits = re.sub(r"\D", "", normalized)
+
+    # Monetary OCR should look like an amount, not a rate/quantity/noise.
+    if "." in normalized:
+        whole = normalized.split(".", 1)[0]
+        whole_digits = re.sub(r"\D", "", whole)
+        return len(whole_digits) >= 2
+
     return len(digits) >= 3
 
 
@@ -66,12 +71,44 @@ def _parse_date(text: str) -> str | None:
 
 
 def _vendor_candidate(lines: list[str]) -> str | None:
-    # Be conservative: only suggest lines that actually look like a business name.
-    for line in lines[:25]:
-        if any(marker in line for marker in THAI_COMPANY_MARKERS):
-            if 6 <= len(line) <= 160:
-                return line[:255]
-    return None
+    # Prefer a compact legal/business name. Reject policy/terms/address/noisy OCR lines.
+    reject_terms = (
+        "ภายใน 7 วัน", "มีวินัยบริษัท", "ไม่คิด", "ปัญหา", "สินค้า", "ใบกำกับภาษี",
+        "โทร", "fax", "เลขประจำตัวผู้เสียภาษี", "ที่อยู่", "ถนน", "ตำบล", "อำเภอ", "จังหวัด",
+    )
+
+    candidates: list[tuple[int, str]] = []
+    for idx, line in enumerate(lines[:30]):
+        low = line.lower()
+        if any(term.lower() in low for term in reject_terms):
+            continue
+        if not any(marker in line for marker in THAI_COMPANY_MARKERS):
+            continue
+        if not (6 <= len(line) <= 90):
+            continue
+
+        score = 0
+        if "บริษัท" in line:
+            score += 4
+        if "จำกัด" in line:
+            score += 4
+        if "หจก." in line or "ห้างหุ้นส่วน" in line:
+            score += 4
+        if "ร้าน" in line:
+            score += 2
+        if idx < 12:
+            score += 2
+        if re.search(r"\d{5}", line):
+            score -= 3
+
+        candidates.append((score, line))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda item: (-item[0], len(item[1])))
+    best_score, best_line = candidates[0]
+    return best_line[:255] if best_score >= 4 else None
 
 
 def _document_candidate(compact: str) -> str | None:
@@ -106,6 +143,16 @@ def analyze_ocr_document(document: dict[str, Any]) -> dict[str, Any]:
     subtotal = _find_amount_near(lines, SUBTOTAL_LABELS)
     vat = _find_amount_near(lines, VAT_LABELS)
     total = _find_amount_near(lines, TOTAL_LABELS)
+
+    # Sanity checks: never propose a VAT amount that is implausible versus document total.
+    if vat and total:
+        try:
+            vat_dec = Decimal(vat)
+            total_dec = Decimal(total)
+            if vat_dec <= 0 or total_dec <= 0 or vat_dec >= total_dec or vat_dec > total_dec * Decimal("0.20"):
+                vat = None
+        except InvalidOperation:
+            vat = None
 
     confidence_notes: list[str] = []
     if not vendor_name:
