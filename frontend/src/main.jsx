@@ -515,8 +515,7 @@ function DocumentPanel({ expenses, project, costCodes, vendors, onUpdated }) {
             </label>
             <label>สถานะจ่าย
               <select value={reviewForm.payment_status} onChange={(e) => setReviewField('payment_status', e.target.value)}>
-                <option value="UNPAID">ยังไม่จ่าย</option>
-                <option value="PAID">จ่ายแล้ว (ให้ไปอัปเดตยอดจ่ายใน Expense)</option>
+                <option value="UNPAID">ยังไม่จ่าย — ตรวจ OCR ก่อน</option>
               </select>
             </label>
             <label>วิธีจ่าย
