@@ -20,21 +20,24 @@ const money = (value) =>
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function ExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
+function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, onSaved }) {
+  const existingSubtotal = Number(existing?.subtotal || 0);
+  const existingVatRate = existingSubtotal > 0 ? String(Math.round(Number(existing?.vat_amount || 0) / existingSubtotal * 100)) : '7';
+  const existingWhtRate = existingSubtotal > 0 ? String(Math.round(Number(existing?.withholding_tax || 0) / existingSubtotal * 100)) : '0';
   const [form, setForm] = useState({
-    project_id: projects[0]?.id || '',
-    cost_code_id: '',
-    vendor_id: '',
-    expense_date: today(),
-    document_no: '',
-    description: '',
-    subtotal: '',
-    vatRate: '7',
-    whtRate: '0',
-    payment_status: 'UNPAID',
-    payment_method: '',
-    paid_amount: '',
-    notes: '',
+    project_id: existing?.project_id || projects[0]?.id || '',
+    cost_code_id: existing?.cost_code_id || '',
+    vendor_id: existing?.vendor_id || '',
+    expense_date: existing?.expense_date || today(),
+    document_no: existing?.document_no || '',
+    description: existing?.description || '',
+    subtotal: existing?.subtotal || '',
+    vatRate: ['0','7'].includes(existingVatRate) ? existingVatRate : '0',
+    whtRate: ['0','1','3','5'].includes(existingWhtRate) ? existingWhtRate : '0',
+    payment_status: existing?.payment_status || 'UNPAID',
+    payment_method: existing?.payment_method || '',
+    paid_amount: existing?.net_paid || '',
+    notes: existing?.notes || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -56,8 +59,8 @@ function ExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
       if (form.payment_status === 'PAID') netPaid = vendorPayable;
       if (form.payment_status === 'UNPAID') netPaid = 0;
 
-      await api('/expenses', {
-        method: 'POST',
+      await api(existing ? `/expenses/${existing.id}` : '/expenses', {
+        method: existing ? 'PUT' : 'POST',
         body: JSON.stringify({
           project_id: Number(form.project_id),
           cost_code_id: Number(form.cost_code_id),
@@ -90,7 +93,7 @@ function ExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
         <div className="modal-head">
           <div>
             <p className="eyebrow">Expense Entry</p>
-            <h2>บันทึกค่าใช้จ่าย</h2>
+            <h2>{existing ? `แก้ไข ${existing.expense_no}` : 'บันทึกค่าใช้จ่าย'}</h2>
           </div>
           <button className="ghost icon" onClick={onClose}>×</button>
         </div>
@@ -176,7 +179,7 @@ function ExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
           {error && <div className="error wide">{error}</div>}
           <div className="actions wide">
             <button type="button" className="ghost" onClick={onClose}>ยกเลิก</button>
-            <button type="submit" disabled={saving}>{saving ? 'กำลังบันทึก…' : 'บันทึกค่าใช้จ่าย'}</button>
+            <button type="submit" disabled={saving}>{saving ? 'กำลังบันทึก…' : (existing ? 'บันทึกการแก้ไข' : 'บันทึกค่าใช้จ่าย')}</button>
           </div>
         </form>
       </div>
@@ -241,13 +244,14 @@ function VendorModal({ onClose, onSaved }) {
 }
 
 
-function DocumentPanel() {
+function DocumentPanel({ expenses, onUpdated }) {
   const [configured, setConfigured] = useState(null);
   const [file, setFile] = useState(null);
   const [taskId, setTaskId] = useState('');
   const [taskData, setTaskData] = useState(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [expenseId, setExpenseId] = useState('');
 
   useEffect(() => {
     api('/documents/status')
@@ -265,11 +269,13 @@ function DocumentPanel() {
       const data = new FormData();
       data.append('document', file);
       data.append('title', file.name);
+      if (expenseId) data.append('expense_id', expenseId);
       const response = await fetch('/api/v1/documents/upload', { method: 'POST', body: data });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || 'อัปโหลดเอกสารไม่สำเร็จ');
       setTaskId(body.task_id);
-      setMessage('ส่งเอกสารเข้า OCR แล้ว');
+      setMessage(expenseId ? 'ส่งเอกสารเข้า OCR และผูกกับค่าใช้จ่ายแล้ว' : 'ส่งเอกสารเข้า OCR แล้ว');
+      if (onUpdated) onUpdated();
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -315,6 +321,12 @@ function DocumentPanel() {
         <span className="status paid">เชื่อมต่อแล้ว</span>
       </div>
       <form className="upload-box" onSubmit={upload}>
+        <select value={expenseId} onChange={(e) => setExpenseId(e.target.value)}>
+          <option value="">เอกสารทั่วไป — ยังไม่ผูกค่าใช้จ่าย</option>
+          {expenses.filter((e) => e.payment_status !== 'VOID').map((e) => (
+            <option key={e.id} value={e.id}>{e.expense_no} — {e.description}</option>
+          ))}
+        </select>
         <input
           type="file"
           accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
@@ -335,6 +347,85 @@ function DocumentPanel() {
   );
 }
 
+
+function ReportPanel({ project }) {
+  const [rows, setRows] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!project?.id) return;
+    api(`/reports/${project.id}/cost-codes`)
+      .then(setRows)
+      .catch((err) => setError(err.message));
+  }, [project?.id]);
+
+  const total = rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+
+  return (
+    <section className="panel">
+      <div className="section-head">
+        <div><h2>รายงานต้นทุนตาม Cost Code</h2><p>Sea Mountain — ไม่รวมรายการที่ยกเลิก</p></div>
+        {project && <button onClick={() => window.open(`/api/v1/reports/${project.id}/expenses.csv`, '_blank')}>Export CSV</button>}
+      </div>
+      {error && <div className="error">{error}</div>}
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Cost Code</th><th>หมวดงาน</th><th>จำนวนรายการ</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ต้นทุนรวม</th><th>ค้างจ่าย</th></tr></thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan="8" className="empty">ยังไม่มีข้อมูลสำหรับรายงาน</td></tr>}
+            {rows.map((r) => (
+              <tr key={r.cost_code_id}>
+                <td className="mono">{r.code}</td>
+                <td>{r.name}</td>
+                <td>{r.expense_count}</td>
+                <td className="amount">{money(r.subtotal)}</td>
+                <td className="amount">{money(r.vat_amount)}</td>
+                <td className="amount">{money(r.withholding_tax)}</td>
+                <td className="amount">{money(r.total_amount)}</td>
+                <td className="amount">{money(r.outstanding_amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="report-total"><span>ต้นทุนรวมตามเอกสาร</span><strong>{money(total)}</strong></div>
+    </section>
+  );
+}
+
+function AuditPanel() {
+  const [logs, setLogs] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api('/audit-logs?limit=100').then(setLogs).catch((err) => setError(err.message));
+  }, []);
+
+  return (
+    <section className="panel">
+      <div className="section-head"><div><h2>Audit Log</h2><p>ประวัติการสร้าง แก้ไข ยกเลิก และผูกเอกสาร</p></div></div>
+      {error && <div className="error">{error}</div>}
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>เวลา</th><th>ประเภท</th><th>ID</th><th>Action</th><th>ผู้ดำเนินการ</th></tr></thead>
+          <tbody>
+            {logs.length === 0 && <tr><td colSpan="5" className="empty">ยังไม่มี Audit Log</td></tr>}
+            {logs.map((log) => (
+              <tr key={log.id}>
+                <td>{new Date(log.created_at).toLocaleString('th-TH')}</td>
+                <td>{log.entity_type}</td>
+                <td>{log.entity_id ?? '-'}</td>
+                <td><span className="status">{log.action}</span></td>
+                <td>{log.actor}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [projects, setProjects] = useState([]);
   const [costCodes, setCostCodes] = useState([]);
@@ -343,6 +434,7 @@ function App() {
   const [summary, setSummary] = useState(null);
   const [showExpense, setShowExpense] = useState(false);
   const [showVendor, setShowVendor] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [active, setActive] = useState('expenses');
   const [error, setError] = useState('');
 
@@ -366,6 +458,20 @@ function App() {
   }
 
   useEffect(() => { loadBase(); }, []);
+
+  async function voidExpense(expense) {
+    const reason = window.prompt(`เหตุผลที่ยกเลิก ${expense.expense_no}`);
+    if (!reason || reason.trim().length < 3) return;
+    try {
+      await api(`/expenses/${expense.id}/void`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      await loadBase();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v.name])), [vendors]);
   const costMap = useMemo(() => Object.fromEntries(costCodes.map((c) => [c.id, `${c.code} ${c.name}`])), [costCodes]);
@@ -399,6 +505,8 @@ function App() {
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
         <button className={active === 'documents' ? 'active' : ''} onClick={() => setActive('documents')}>เอกสาร / OCR</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
+        <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
+        <button className={active === 'audit' ? 'active' : ''} onClick={() => setActive('audit')}>Audit Log</button>
       </nav>
 
       {active === 'expenses' && (
@@ -409,9 +517,9 @@ function App() {
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ยอด</th><th>สถานะ</th></tr></thead>
+              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ยอด</th><th>เอกสาร</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
               <tbody>
-                {expenses.length === 0 && <tr><td colSpan="7" className="empty">ยังไม่มีค่าใช้จ่าย — เพิ่มรายการแรกของ Sea Mountain ได้เลย</td></tr>}
+                {expenses.length === 0 && <tr><td colSpan="9" className="empty">ยังไม่มีค่าใช้จ่าย — เพิ่มรายการแรกของ Sea Mountain ได้เลย</td></tr>}
                 {expenses.map((e) => (
                   <tr key={e.id}>
                     <td>{e.expense_date}</td>
@@ -420,7 +528,14 @@ function App() {
                     <td>{costMap[e.cost_code_id] || '-'}</td>
                     <td>{vendorMap[e.vendor_id] || '-'}</td>
                     <td className="amount">{money(e.total_amount)}</td>
+                    <td>{e.paperless_document_id ? <span className="status paid">DOC #{e.paperless_document_id}</span> : (e.document_task_id ? <span className="status partial">OCR</span> : '-')}</td>
                     <td><span className={`status ${e.payment_status.toLowerCase()}`}>{({UNPAID:'ยังไม่จ่าย',PARTIAL:'บางส่วน',PAID:'จ่ายแล้ว',VOID:'ยกเลิก'})[e.payment_status]}</span></td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}>แก้ไข</button>
+                        <button className="mini danger" disabled={e.payment_status === 'VOID'} onClick={() => voidExpense(e)}>ยกเลิก</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -448,7 +563,10 @@ function App() {
         </section>
       )}
 
-      {active === 'documents' && <DocumentPanel />}
+      {active === 'documents' && <DocumentPanel expenses={expenses} onUpdated={loadBase} />}
+
+      {active === 'reports' && <ReportPanel project={project} />}
+      {active === 'audit' && <AuditPanel />}
 
       {active === 'codes' && (
         <section className="panel">
@@ -466,6 +584,17 @@ function App() {
           vendors={vendors}
           onClose={() => setShowExpense(false)}
           onSaved={async () => { setShowExpense(false); await loadBase(); }}
+        />
+      )}
+
+      {editingExpense && (
+        <ExpenseModal
+          projects={projects}
+          costCodes={costCodes}
+          vendors={vendors}
+          existing={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onSaved={async () => { setEditingExpense(null); await loadBase(); }}
         />
       )}
       {showVendor && (
