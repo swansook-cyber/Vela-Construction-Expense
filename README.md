@@ -3,36 +3,81 @@
 Standalone construction expense and document management system.
 
 ## Initial project
-- Project code: SEA-MOUNTAIN
-- Project name: Sea Mountain
+- Project code: `SEA-MOUNTAIN`
+- Project name: **Sea Mountain**
 
-## V1 goals
-- Separate from SmartHR (database, users, backups, business logic)
-- Track projects, cost codes, vendors, expenses, payments, and documents
-- Store links/metadata for Paperless-ngx documents
-- Mobile-first expense capture workflow
-- Export-ready reporting foundation
+## Current status
+V0.2 expense workflow + V0.3 document/OCR foundation.
 
-## Stack
-- Backend: FastAPI + SQLAlchemy + PostgreSQL
-- Frontend: React + Vite
-- Deployment: Docker Compose
-- Document/OCR engine: Paperless-ngx via API integration (phase 1 connector shell)
+### Working modules
+- Sea Mountain project dashboard
+- Construction Cost Codes
+- Vendor / contractor master
+- Expense entry
+- VAT and withholding tax
+- Payment status / method
+- Expense history
+- PostgreSQL + Alembic migrations
+- Paperless-ngx document upload API/UI foundation
 
-## Run
+## Architecture
+- Frontend: React + Vite + Nginx
+- Backend: FastAPI + SQLAlchemy + Alembic
+- Expense database: PostgreSQL
+- Document/OCR engine: Paperless-ngx
+- Paperless database: separate PostgreSQL
+- Paperless task broker: Redis
+
+SmartHR is not shared or imported.
+
+## First deployment
+
+Copy the environment template and replace all passwords/secrets before starting:
+
 ```bash
-docker compose up --build
+cp .env.example .env
+nano .env
+docker compose up -d --build
 ```
 
-Backend health: http://localhost:8098/health
-Frontend: http://localhost:8097
+Services:
+- Vela Construction Expense: http://SERVER:8097
+- Backend health: http://SERVER:8098/health
+- Paperless-ngx admin UI: http://SERVER:8099
 
-## Core workflow
-1. Upload/capture document
-2. OCR/document metadata from Paperless-ngx
-3. Select Project
-4. Select Cost Code
-5. Select/Create Vendor
-6. Review totals, VAT, withholding tax, payment status
-7. Save expense
-8. Export/report
+Paperless will ask for its first administrator during initial setup. After login, generate an API token from the Paperless user profile and put it in:
+
+```env
+PAPERLESS_TOKEN=your_token_here
+```
+
+Then restart only the Vela backend:
+
+```bash
+docker compose restart backend
+```
+
+The **เอกสาร / OCR** tab in Vela will then show Paperless as connected.
+
+## Accounting rules in current version
+
+```
+document total = subtotal + VAT
+vendor payable = document total - withholding tax
+outstanding vendor payable = vendor payable - amount paid
+```
+
+Withholding tax is kept as part of the expense/tax record but is not treated as money still owed to the vendor.
+
+## OCR defaults
+- Thai OCR language installed: `tha`
+- Default OCR: `tha+eng`
+- Timezone: `Asia/Bangkok`
+
+## Next
+- Associate asynchronous Paperless OCR result with Expense automatically
+- Expense edit / void workflow
+- Audit log
+- Excel/PDF project reports
+- Budget vs actual
+- PO / contractor progress claims
