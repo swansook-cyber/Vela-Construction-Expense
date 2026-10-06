@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,10 +54,27 @@ class ExpenseCreate(BaseModel):
     notes: str | None = None
 
 
+class ExpenseUpdate(ExpenseCreate):
+    pass
+
+
 class ExpenseOut(ExpenseCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
     expense_no: str
+    document_task_id: str | None = None
+    void_reason: str | None = None
+    voided_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExpenseVoid(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class DocumentLink(BaseModel):
+    paperless_document_id: int
 
 
 class DashboardSummary(BaseModel):
@@ -68,3 +85,28 @@ class DashboardSummary(BaseModel):
     outstanding_amount: Decimal
     expense_count: int
     unpaid_count: int
+
+
+class CostCodeSummary(BaseModel):
+    cost_code_id: int
+    code: str
+    name: str
+    expense_count: int
+    subtotal: Decimal
+    vat_amount: Decimal
+    withholding_tax: Decimal
+    total_amount: Decimal
+    vendor_payable: Decimal
+    paid_amount: Decimal
+    outstanding_amount: Decimal
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    entity_type: str
+    entity_id: int | None
+    action: str
+    actor: str
+    details: str | None
+    created_at: datetime
