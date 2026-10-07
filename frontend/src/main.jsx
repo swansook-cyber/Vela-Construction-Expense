@@ -827,47 +827,160 @@ function DocumentPanel({ expenses, project, costCodes, vendors, onUpdated }) {
 }
 
 
-function ReportPanel({ project }) {
-  const [rows, setRows] = useState([]);
-  const [error, setError] = useState('');
+function ReportPanel({ project, expenses, costCodes, vendors }) {
+  const [month, setMonth] = useState(today().slice(0, 7));
+  const [costCodeId, setCostCodeId] = useState('');
+  const [vendorId, setVendorId] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('');
+  const [view, setView] = useState('DETAIL');
 
-  useEffect(() => {
-    if (!project?.id) return;
-    api(`/reports/${project.id}/cost-codes`)
-      .then(setRows)
-      .catch((err) => setError(err.message));
-  }, [project?.id]);
+  const costMap = useMemo(() => Object.fromEntries(costCodes.map((c) => [c.id, c])), [costCodes]);
+  const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v])), [vendors]);
 
-  const total = rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+  const filtered = useMemo(() => expenses.filter((e) => {
+    if (e.payment_status === 'VOID') return false;
+    if (month && !String(e.expense_date).startsWith(month)) return false;
+    if (costCodeId && String(e.cost_code_id) !== String(costCodeId)) return false;
+    if (vendorId && String(e.vendor_id || '') !== String(vendorId)) return false;
+    if (paymentStatus && e.payment_status !== paymentStatus) return false;
+    return true;
+  }), [expenses, month, costCodeId, vendorId, paymentStatus]);
+
+  const totals = useMemo(() => filtered.reduce((acc, e) => {
+    const total = Number(e.total_amount || 0);
+    const wht = Number(e.withholding_tax || 0);
+    const paid = Number(e.net_paid || 0);
+    acc.subtotal += Number(e.subtotal || 0);
+    acc.vat += Number(e.vat_amount || 0);
+    acc.wht += wht;
+    acc.total += total;
+    acc.paid += paid;
+    acc.outstanding += Math.max(total - wht - paid, 0);
+    return acc;
+  }, { subtotal: 0, vat: 0, wht: 0, total: 0, paid: 0, outstanding: 0 }), [filtered]);
+
+  const grouped = useMemo(() => {
+    const rows = {};
+    for (const e of filtered) {
+      const code = costMap[e.cost_code_id] || { code: '-', name: '-' };
+      const key = String(e.cost_code_id);
+      if (!rows[key]) rows[key] = { code: code.code, name: code.name, count: 0, subtotal: 0, vat: 0, wht: 0, total: 0, paid: 0, outstanding: 0 };
+      const row = rows[key];
+      const total = Number(e.total_amount || 0);
+      const wht = Number(e.withholding_tax || 0);
+      const paid = Number(e.net_paid || 0);
+      row.count += 1;
+      row.subtotal += Number(e.subtotal || 0);
+      row.vat += Number(e.vat_amount || 0);
+      row.wht += wht;
+      row.total += total;
+      row.paid += paid;
+      row.outstanding += Math.max(total - wht - paid, 0);
+    }
+    return Object.entries(rows).map(([id, row]) => ({ id, ...row })).sort((a, b) => String(a.code).localeCompare(String(b.code)));
+  }, [filtered, costMap]);
+
+  const monthLabel = useMemo(() => {
+    if (!month) return 'ทุกเดือน';
+    const parts = month.split('-').map(Number);
+    return new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(parts[0], parts[1] - 1, 1));
+  }, [month]);
 
   return (
-    <section className="panel">
-      <div className="section-head">
-        <div><h2>รายงานต้นทุนตาม Cost Code</h2><p>Sea Mountain — ไม่รวมรายการที่ยกเลิก</p></div>
-        {project && <button onClick={() => window.open(`/api/v1/reports/${project.id}/expenses.csv`, '_blank')}>Export CSV</button>}
+    <section className="panel report-panel">
+      <div className="report-screen-head no-print">
+        <div><h2>รายงานค่าใช้จ่าย</h2><p>เลือกเดือนและตัวกรอง แล้วปริ้นหรือบันทึกเป็น PDF ได้</p></div>
+        <div className="report-actions">
+          {project && <button className="ghost" onClick={() => window.open(`/api/v1/reports/${project.id}/expenses.csv`, '_blank')}>Export CSV</button>}
+          <button onClick={() => window.print()}>Print / PDF</button>
+        </div>
       </div>
-      {error && <div className="error">{error}</div>}
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Cost Code</th><th>หมวดงาน</th><th>จำนวนรายการ</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ต้นทุนรวม</th><th>ค้างจ่าย</th></tr></thead>
-          <tbody>
-            {rows.length === 0 && <tr><td colSpan="8" className="empty">ยังไม่มีข้อมูลสำหรับรายงาน</td></tr>}
-            {rows.map((r) => (
-              <tr key={r.cost_code_id}>
-                <td className="mono">{r.code}</td>
-                <td>{r.name}</td>
-                <td>{r.expense_count}</td>
-                <td className="amount">{money(r.subtotal)}</td>
-                <td className="amount">{money(r.vat_amount)}</td>
-                <td className="amount">{money(r.withholding_tax)}</td>
-                <td className="amount">{money(r.total_amount)}</td>
-                <td className="amount">{money(r.outstanding_amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="report-filters no-print">
+        <label>เดือน
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+        <label>Cost Code
+          <select value={costCodeId} onChange={(e) => setCostCodeId(e.target.value)}>
+            <option value="">ทั้งหมด</option>
+            {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+          </select>
+        </label>
+        <label>ผู้ขาย
+          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+            <option value="">ทั้งหมด</option>
+            {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </label>
+        <label>สถานะ
+          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+            <option value="">ทั้งหมด</option>
+            <option value="UNPAID">ยังไม่จ่าย</option>
+            <option value="PARTIAL">จ่ายบางส่วน</option>
+            <option value="PAID">จ่ายแล้ว</option>
+          </select>
+        </label>
+        <label>รูปแบบ
+          <select value={view} onChange={(e) => setView(e.target.value)}>
+            <option value="DETAIL">รายละเอียดค่าใช้จ่าย</option>
+            <option value="SUMMARY">สรุปตาม Cost Code</option>
+          </select>
+        </label>
+        <button className="ghost report-clear" onClick={() => { setMonth(''); setCostCodeId(''); setVendorId(''); setPaymentStatus(''); }}>ล้างตัวกรอง</button>
       </div>
-      <div className="report-total"><span>ต้นทุนรวมตามเอกสาร</span><strong>{money(total)}</strong></div>
+
+      <div className="report-print">
+        <div className="print-title">
+          <p className="eyebrow">Vela Construction Expense</p>
+          <h2>{project?.name || 'Sea Mountain'}</h2>
+          <h3>{view === 'DETAIL' ? 'รายงานรายละเอียดค่าใช้จ่าย' : 'สรุปค่าใช้จ่ายตาม Cost Code'}</h3>
+          <p>ประจำเดือน {monthLabel}</p>
+        </div>
+
+        <div className="report-kpis">
+          <div><span>จำนวนรายการ</span><strong>{filtered.length}</strong></div>
+          <div><span>ต้นทุนรวม</span><strong>{money(totals.total)}</strong></div>
+          <div><span>จ่ายแล้ว</span><strong>{money(totals.paid)}</strong></div>
+          <div><span>ค้างจ่าย</span><strong>{money(totals.outstanding)}</strong></div>
+        </div>
+
+        {view === 'DETAIL' ? (
+          <div className="table-wrap report-table-wrap">
+            <table className="report-table detail-report">
+              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
+              <tbody>
+                {filtered.length === 0 && <tr><td colSpan="11" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
+                {filtered.map((e) => {
+                  const code = costMap[e.cost_code_id];
+                  const vendor = vendorMap[e.vendor_id];
+                  const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
+                  return <tr key={e.id}>
+                    <td>{e.expense_date}</td><td className="mono">{e.expense_no}</td><td>{e.description}</td>
+                    <td>{code ? `${code.code} ${code.name}` : '-'}</td><td>{vendor?.name || '-'}</td>
+                    <td className="amount">{money(e.subtotal)}</td><td className="amount">{money(e.vat_amount)}</td>
+                    <td className="amount">{money(e.withholding_tax)}</td><td className="amount">{money(e.total_amount)}</td>
+                    <td className="amount">{money(e.net_paid)}</td><td className="amount">{money(outstanding)}</td>
+                  </tr>;
+                })}
+              </tbody>
+              {filtered.length > 0 && <tfoot><tr><th colSpan="5">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
+            </table>
+          </div>
+        ) : (
+          <div className="table-wrap report-table-wrap">
+            <table className="report-table">
+              <thead><tr><th>Cost Code</th><th>หมวดงาน</th><th>รายการ</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ต้นทุนรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
+              <tbody>
+                {grouped.length === 0 && <tr><td colSpan="9" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
+                {grouped.map((r) => <tr key={r.id}><td className="mono">{r.code}</td><td>{r.name}</td><td>{r.count}</td><td className="amount">{money(r.subtotal)}</td><td className="amount">{money(r.vat)}</td><td className="amount">{money(r.wht)}</td><td className="amount">{money(r.total)}</td><td className="amount">{money(r.paid)}</td><td className="amount">{money(r.outstanding)}</td></tr>)}
+              </tbody>
+              {grouped.length > 0 && <tfoot><tr><th colSpan="3">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
+            </table>
+          </div>
+        )}
+
+        <div className="print-footer"><span>Sea Mountain — Vela Construction Expense</span><span>พิมพ์เมื่อ {new Date().toLocaleString('th-TH')}</span></div>
+      </div>
     </section>
   );
 }
@@ -1048,7 +1161,7 @@ function App() {
 
       {active === 'documents' && <DocumentPanel expenses={expenses} project={project} costCodes={costCodes} vendors={vendors} onUpdated={loadBase} />}
 
-      {active === 'reports' && <ReportPanel project={project} />}
+      {active === 'reports' && <ReportPanel project={project} expenses={expenses} costCodes={costCodes} vendors={vendors} />}
       {active === 'audit' && <AuditPanel />}
 
       {active === 'codes' && (
