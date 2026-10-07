@@ -144,3 +144,45 @@ textarea { resize: vertical; }
   .attach-form .actions { flex-direction: column-reverse; }
   .attach-form .actions button { width: 100%; }
 }
+
+.report-screen-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.report-actions { display:flex; gap:8px; }
+.report-filters { display:grid; grid-template-columns: repeat(5, minmax(150px,1fr)) auto; gap:10px; align-items:end; margin-bottom:18px; padding:14px; border:1px solid #e4eaed; border-radius:14px; background:#f8fafb; }
+.report-clear { height:42px; }
+.print-title { text-align:center; margin:8px 0 18px; }
+.print-title h2 { margin:2px 0 4px; font-size:28px; }
+.print-title h3 { margin:0 0 4px; font-size:18px; }
+.report-kpis { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.report-kpis div { border:1px solid #e4eaed; border-radius:12px; padding:12px 14px; }
+.report-kpis span { display:block; color:#6c7880; font-size:11px; margin-bottom:4px; }
+.report-kpis strong { font-size:16px; }
+.report-table { min-width:980px; }
+.report-table tfoot th { padding:12px; border-top:2px solid #d8e0e4; background:#f8fafb; }
+.print-footer { display:flex; justify-content:space-between; gap:16px; margin-top:18px; padding-top:10px; border-top:1px solid #dfe5e8; color:#77838b; font-size:11px; }
+@media (max-width: 900px) {
+  .report-filters { grid-template-columns:1fr 1fr; }
+  .report-clear { width:100%; }
+}
+@media (max-width: 760px) {
+  .report-screen-head { flex-direction:column; }
+  .report-actions { width:100%; }
+  .report-actions button { flex:1; }
+  .report-filters { grid-template-columns:1fr; }
+  .report-kpis { grid-template-columns:1fr 1fr; }
+}
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body { background:white !important; }
+  main { max-width:none; padding:0; }
+  main > header, .grid, .tabs, .no-print { display:none !important; }
+  .report-panel { border:0; box-shadow:none; margin:0; padding:0; }
+  .report-print { display:block !important; }
+  .report-table-wrap { overflow:visible !important; }
+  .report-table { min-width:0; width:100%; font-size:9px; }
+  .report-table th, .report-table td { padding:5px 6px; font-size:9px; }
+  .print-title h2 { font-size:22px; }
+  .print-title h3 { font-size:15px; }
+  .report-kpis div { padding:8px 10px; }
+  .report-kpis strong { font-size:13px; }
+  .print-footer { position:static; margin-top:10px; }
+}
