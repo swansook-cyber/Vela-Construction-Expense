@@ -238,3 +238,35 @@ textarea { resize: vertical; }
   .detail-report th:nth-child(n+7),
   .detail-report td:nth-child(n+7) { text-align: right !important; }
 }
+
+/* Prevent printed currency values from wrapping in detail report totals. */
+.detail-report th.amount,
+.detail-report td.amount,
+.detail-report tfoot .amount {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+.detail-report th:nth-child(1), .detail-report td:nth-child(1) { width: 7.5%; }
+.detail-report th:nth-child(2), .detail-report td:nth-child(2) { width: 9.5%; }
+.detail-report th:nth-child(3), .detail-report td:nth-child(3) { width: 8.5%; }
+.detail-report th:nth-child(4), .detail-report td:nth-child(4) { width: 13%; }
+.detail-report th:nth-child(5), .detail-report td:nth-child(5) { width: 14%; }
+.detail-report th:nth-child(6), .detail-report td:nth-child(6) { width: 12.5%; }
+.detail-report th:nth-child(7), .detail-report td:nth-child(7) { width: 7.5%; }
+.detail-report th:nth-child(8), .detail-report td:nth-child(8) { width: 5.5%; }
+.detail-report th:nth-child(9), .detail-report td:nth-child(9) { width: 5.5%; }
+.detail-report th:nth-child(10), .detail-report td:nth-child(10) { width: 7.5%; }
+.detail-report th:nth-child(11), .detail-report td:nth-child(11) { width: 7.5%; }
+.detail-report th:nth-child(12), .detail-report td:nth-child(12) { width: 6%; }
+
+@media print {
+  .detail-report th,
+  .detail-report td {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+  .detail-report .amount {
+    white-space: nowrap !important;
+  }
+}
