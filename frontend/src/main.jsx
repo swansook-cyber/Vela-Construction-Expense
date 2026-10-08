@@ -977,9 +977,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
 
       <div className="report-print">
         <div className="print-title">
-          <p className="eyebrow">Vela Construction Expense</p>
           <h2>{project?.name || 'Sea Mountain'}</h2>
-          <h3>{view === 'DETAIL' ? 'รายงานรายละเอียดค่าใช้จ่าย' : 'สรุปค่าใช้จ่ายตาม Cost Code'}</h3>
           <p>{month ? `ประจำเดือน ${monthLabel}` : monthLabel}</p>
         </div>
 
