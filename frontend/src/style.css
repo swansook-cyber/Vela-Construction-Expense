@@ -208,3 +208,33 @@ textarea { resize: vertical; }
   .signature-block b { font-size: 10px; white-space: nowrap; }
   .signature-block small { font-size: 8px; }
 }
+
+/* Report readability: keep KPI cards on one row and lock table columns. */
+.report-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.detail-report { table-layout: fixed; }
+.detail-report th:nth-child(1), .detail-report td:nth-child(1) { width: 8%; white-space: nowrap; }
+.detail-report th:nth-child(2), .detail-report td:nth-child(2) { width: 10%; white-space: nowrap; }
+.detail-report th:nth-child(3), .detail-report td:nth-child(3) { width: 9%; white-space: nowrap; }
+.detail-report th:nth-child(4), .detail-report td:nth-child(4) { width: 14%; }
+.detail-report th:nth-child(5), .detail-report td:nth-child(5) { width: 14%; }
+.detail-report th:nth-child(6), .detail-report td:nth-child(6) { width: 13%; }
+.detail-report th:nth-child(n+7), .detail-report td:nth-child(n+7) { width: 6.4%; white-space: nowrap; text-align: right; }
+.detail-report th:nth-child(4),
+.detail-report th:nth-child(5),
+.detail-report th:nth-child(6),
+.detail-report td:nth-child(4),
+.detail-report td:nth-child(5),
+.detail-report td:nth-child(6) { overflow-wrap: anywhere; }
+
+@media print {
+  .report-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+  .report-kpis div { min-width: 0; }
+  .detail-report { table-layout: fixed !important; }
+  .detail-report th, .detail-report td { vertical-align: top; }
+  .detail-report th:nth-child(n+7),
+  .detail-report td:nth-child(n+7) { text-align: right !important; }
+}
