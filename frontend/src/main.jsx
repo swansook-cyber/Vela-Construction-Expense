@@ -835,7 +835,7 @@ function DocumentPanel({ expenses, project, costCodes, vendors, onUpdated }) {
 
 
 function ReportPanel({ project, expenses, costCodes, vendors }) {
-  const [month, setMonth] = useState(today().slice(0, 7));
+  const [month, setMonth] = useState('');
   const [costCodeId, setCostCodeId] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
@@ -887,8 +887,16 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     return Object.entries(rows).map(([id, row]) => ({ id, ...row })).sort((a, b) => String(a.code).localeCompare(String(b.code)));
   }, [filtered, costMap]);
 
+  const availableMonths = useMemo(() => {
+    return [...new Set(
+      expenses
+        .filter((e) => e.payment_status !== 'VOID' && e.expense_date)
+        .map((e) => String(e.expense_date).slice(0, 7))
+    )].sort().reverse();
+  }, [expenses]);
+
   const monthLabel = useMemo(() => {
-    if (!month) return 'ทุกเดือน';
+    if (!month) return 'ค่าใช้จ่ายทั้งหมด';
     const parts = month.split('-').map(Number);
     return new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(parts[0], parts[1] - 1, 1));
   }, [month]);
@@ -928,8 +936,15 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
       </div>
 
       <div className="report-filters no-print">
-        <label>เดือน
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <label>ช่วงเวลา
+          <select value={month} onChange={(e) => setMonth(e.target.value)}>
+            <option value="">ทั้งหมด — ไม่ระบุเดือน</option>
+            {availableMonths.map((m) => {
+              const [y, mo] = m.split('-').map(Number);
+              const label = new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(y, mo - 1, 1));
+              return <option key={m} value={m}>{label}</option>;
+            })}
+          </select>
         </label>
         <label>Cost Code
           <select value={costCodeId} onChange={(e) => setCostCodeId(e.target.value)}>
@@ -965,7 +980,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
           <p className="eyebrow">Vela Construction Expense</p>
           <h2>{project?.name || 'Sea Mountain'}</h2>
           <h3>{view === 'DETAIL' ? 'รายงานรายละเอียดค่าใช้จ่าย' : 'สรุปค่าใช้จ่ายตาม Cost Code'}</h3>
-          <p>ประจำเดือน {monthLabel}</p>
+          <p>{month ? `ประจำเดือน ${monthLabel}` : monthLabel}</p>
         </div>
 
         <div className="report-kpis">
