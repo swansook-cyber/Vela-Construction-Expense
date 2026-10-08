@@ -186,3 +186,17 @@ textarea { resize: vertical; }
   .report-kpis strong { font-size:13px; }
   .print-footer { position:static; margin-top:10px; }
 }
+
+.signature-block { display:grid; grid-template-columns:repeat(3,1fr); gap:28px; margin-top:26px; padding-top:18px; }
+.signature-block div { text-align:center; display:flex; flex-direction:column; gap:10px; }
+.signature-block span { font-weight:700; font-size:12px; color:#4e5d67; }
+.signature-block b { font-weight:400; letter-spacing:.02em; }
+.signature-block small { color:#7a8790; font-size:10px; }
+@media (max-width:760px) {
+  .signature-block { grid-template-columns:1fr; gap:18px; }
+}
+@media print {
+  .signature-block { page-break-inside:avoid; margin-top:18px; gap:18px; }
+  .signature-block span { font-size:10px; }
+  .signature-block small { font-size:8px; }
+}
