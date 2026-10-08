@@ -20,6 +20,13 @@ const money = (value) =>
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const thaiDate = (value) => {
+  if (!value) return '-';
+  const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return value;
+  return new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(y, m - 1, d));
+};
+
 function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
   const [form, setForm] = useState({
     project_id: projects[0]?.id || '',
@@ -886,12 +893,36 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     return new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(parts[0], parts[1] - 1, 1));
   }, [month]);
 
+  function exportFilteredCsv() {
+    const header = ['วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code','ผู้ขาย','ก่อน VAT','VAT','WHT','ยอดรวม','จ่ายแล้ว','ค้างจ่าย','สถานะ'];
+    const rows = filtered.map((e) => {
+      const code = costMap[e.cost_code_id];
+      const vendor = vendorMap[e.vendor_id];
+      const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
+      return [
+        thaiDate(e.expense_date), e.expense_no, e.document_no || '', e.description,
+        code ? `${code.code} ${code.name}` : '', vendor?.name || '',
+        e.subtotal, e.vat_amount, e.withholding_tax, e.total_amount, e.net_paid,
+        outstanding.toFixed(2), e.payment_status
+      ];
+    });
+    const esc = (v) => '"' + String(v ?? '').replaceAll('"', '""') + '"';
+    const csv = '\ufeff' + [header, ...rows].map((row) => row.map(esc).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project?.code || 'project'}-${month || 'all'}-expenses.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section className="panel report-panel">
       <div className="report-screen-head no-print">
         <div><h2>รายงานค่าใช้จ่าย</h2><p>เลือกเดือนและตัวกรอง แล้วปริ้นหรือบันทึกเป็น PDF ได้</p></div>
         <div className="report-actions">
-          {project && <button className="ghost" onClick={() => window.open(`/api/v1/reports/${project.id}/expenses.csv`, '_blank')}>Export CSV</button>}
+          <button className="ghost" onClick={exportFilteredCsv}>Export CSV</button>
           <button onClick={() => window.print()}>Print / PDF</button>
         </div>
       </div>
@@ -947,15 +978,15 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
         {view === 'DETAIL' ? (
           <div className="table-wrap report-table-wrap">
             <table className="report-table detail-report">
-              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
+              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>เลขที่เอกสาร</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
               <tbody>
-                {filtered.length === 0 && <tr><td colSpan="11" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan="12" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
                 {filtered.map((e) => {
                   const code = costMap[e.cost_code_id];
                   const vendor = vendorMap[e.vendor_id];
                   const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
                   return <tr key={e.id}>
-                    <td>{e.expense_date}</td><td className="mono">{e.expense_no}</td><td>{e.description}</td>
+                    <td>{thaiDate(e.expense_date)}</td><td className="mono">{e.expense_no}</td><td>{e.document_no || '-'}</td><td>{e.description}</td>
                     <td>{code ? `${code.code} ${code.name}` : '-'}</td><td>{vendor?.name || '-'}</td>
                     <td className="amount">{money(e.subtotal)}</td><td className="amount">{money(e.vat_amount)}</td>
                     <td className="amount">{money(e.withholding_tax)}</td><td className="amount">{money(e.total_amount)}</td>
@@ -963,7 +994,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
                   </tr>;
                 })}
               </tbody>
-              {filtered.length > 0 && <tfoot><tr><th colSpan="5">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
+              {filtered.length > 0 && <tfoot><tr><th colSpan="6">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
             </table>
           </div>
         ) : (
@@ -979,6 +1010,11 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
           </div>
         )}
 
+        <div className="signature-block">
+          <div><span>ผู้จัดทำ</span><b>................................................</b><small>วันที่ ........../........../..........</small></div>
+          <div><span>ผู้ตรวจสอบ</span><b>................................................</b><small>วันที่ ........../........../..........</small></div>
+          <div><span>ผู้อนุมัติ</span><b>................................................</b><small>วันที่ ........../........../..........</small></div>
+        </div>
         <div className="print-footer"><span>Sea Mountain — Vela Construction Expense</span><span>พิมพ์เมื่อ {new Date().toLocaleString('th-TH')}</span></div>
       </div>
     </section>
