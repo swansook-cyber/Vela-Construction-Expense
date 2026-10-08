@@ -196,7 +196,15 @@ textarea { resize: vertical; }
   .signature-block { grid-template-columns:1fr; gap:18px; }
 }
 @media print {
-  .signature-block { page-break-inside:avoid; margin-top:18px; gap:18px; }
-  .signature-block span { font-size:10px; }
-  .signature-block small { font-size:8px; }
+  .signature-block {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    page-break-inside: avoid;
+    margin-top: 14px;
+    padding-top: 10px;
+    gap: 28px;
+  }
+  .signature-block div { gap: 6px; }
+  .signature-block span { font-size: 10px; }
+  .signature-block b { font-size: 10px; white-space: nowrap; }
+  .signature-block small { font-size: 8px; }
 }
