@@ -82,6 +82,7 @@ class DashboardSummary(BaseModel):
     project_name: str
     total_expenses: Decimal
     paid_amount: Decimal
+    withholding_tax: Decimal
     outstanding_amount: Decimal
     expense_count: int
     unpaid_count: int
