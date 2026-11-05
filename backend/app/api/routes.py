@@ -10,11 +10,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models.entities import AuditLog, CostCode, Expense, PaymentVoucher, Project, Vendor
+from app.models.entities import AuditLog, CompanyProfile, CostCode, Expense, PaymentVoucher, Project, Vendor
 from app.services.paperless import PaperlessClient
 from app.services.ocr_review import analyze_ocr_document
 from app.schemas.entities import (
     AuditLogOut,
+    CompanyProfileOut,
+    CompanyProfileUpdate,
     CostCodeOut,
     CostCodeSummary,
     DashboardSummary,
@@ -156,6 +158,32 @@ def _extract_document_id(payload: Any) -> int | None:
                 return found
 
     return None
+
+
+@router.get("/company-profile", response_model=CompanyProfileOut)
+def get_company_profile(db: Session = Depends(get_db)):
+    profile = db.get(CompanyProfile, 1)
+    if not profile:
+        profile = CompanyProfile(id=1, legal_name="Sea Mountain")
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return profile
+
+
+@router.put("/company-profile", response_model=CompanyProfileOut)
+def update_company_profile(payload: CompanyProfileUpdate, db: Session = Depends(get_db)):
+    profile = db.get(CompanyProfile, 1)
+    if not profile:
+        profile = CompanyProfile(id=1, legal_name=payload.legal_name)
+        db.add(profile)
+    for key, value in payload.model_dump().items():
+        setattr(profile, key, value)
+    profile.updated_at = datetime.utcnow()
+    add_audit(db, "company_profile", 1, "UPDATE", payload.model_dump())
+    db.commit()
+    db.refresh(profile)
+    return profile
 
 
 @router.get("/projects", response_model=list[ProjectOut])
