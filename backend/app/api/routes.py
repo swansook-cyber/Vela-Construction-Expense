@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models.entities import AuditLog, CompanyProfile, CostCode, Expense, PaymentVoucher, Project, Vendor
+from app.models.entities import AuditLog, CompanyProfile, CostCode, Expense, PaymentVoucher, PaymentVoucherItem, Project, Vendor
 from app.services.paperless import PaperlessClient
 from app.services.ocr_review import analyze_ocr_document
 from app.schemas.entities import (
@@ -359,37 +359,66 @@ def list_payment_vouchers(project_id: int | None = None, db: Session = Depends(g
 
 @router.post("/payment-vouchers", response_model=PaymentVoucherOut, status_code=201)
 def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(get_db)):
-    expense = db.get(Expense, payload.expense_id)
-    if not expense:
-        raise HTTPException(status_code=404, detail="Expense not found")
-    if expense.payment_status == "VOID":
+    requested_ids = list(dict.fromkeys(payload.expense_ids or ([] if payload.expense_id is None else [payload.expense_id])))
+    if not requested_ids:
+        raise HTTPException(status_code=400, detail="At least one expense is required")
+
+    expenses = db.scalars(select(Expense).where(Expense.id.in_(requested_ids))).all()
+    if len(expenses) != len(requested_ids):
+        raise HTTPException(status_code=404, detail="One or more expenses were not found")
+
+    expense_map = {expense.id: expense for expense in expenses}
+    expenses = [expense_map[expense_id] for expense_id in requested_ids]
+
+    if any(expense.payment_status == "VOID" for expense in expenses):
         raise HTTPException(status_code=409, detail="Voided expense cannot be paid")
-    if expense.project_id != payload.project_id:
+    if any(expense.project_id != payload.project_id for expense in expenses):
         raise HTTPException(status_code=400, detail="Expense project mismatch")
+
+    vendor_ids = {expense.vendor_id for expense in expenses}
+    if len(vendor_ids) != 1:
+        raise HTTPException(status_code=400, detail="All expenses in one payment voucher must have the same vendor")
+    expense_vendor_id = next(iter(vendor_ids))
+    if payload.vendor_id != expense_vendor_id:
+        raise HTTPException(status_code=400, detail="Payment voucher vendor must match selected expenses")
     if payload.vendor_id is not None and not db.get(Vendor, payload.vendor_id):
         raise HTTPException(status_code=400, detail="Invalid vendor")
-    if db.scalar(select(PaymentVoucher).where(PaymentVoucher.expense_id == payload.expense_id)):
-        raise HTTPException(status_code=409, detail="Expense already has a payment voucher")
-    if payload.gross_amount < 0 or payload.withholding_tax < 0 or payload.net_amount < 0:
-        raise HTTPException(status_code=400, detail="Amounts cannot be negative")
 
-    expected_net = max(payload.gross_amount - payload.withholding_tax, Decimal("0"))
-    if abs(payload.net_amount - expected_net) > Decimal("0.01"):
+    already_linked = db.scalars(
+        select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id.in_(requested_ids))
+    ).all()
+    if already_linked:
+        raise HTTPException(status_code=409, detail="One or more expenses already have a payment voucher")
+
+    gross_amount = sum((Decimal(expense.total_amount or 0) for expense in expenses), Decimal("0"))
+    withholding_tax = sum((Decimal(expense.withholding_tax or 0) for expense in expenses), Decimal("0"))
+    net_amount = max(gross_amount - withholding_tax, Decimal("0"))
+
+    if abs(Decimal(payload.gross_amount) - gross_amount) > Decimal("0.01"):
+        raise HTTPException(status_code=400, detail="Gross amount must equal selected expense total")
+    if abs(Decimal(payload.withholding_tax) - withholding_tax) > Decimal("0.01"):
+        raise HTTPException(status_code=400, detail="Withholding tax must equal selected expense withholding tax")
+    if abs(Decimal(payload.net_amount) - net_amount) > Decimal("0.01"):
         raise HTTPException(status_code=400, detail="Net amount must equal gross amount minus withholding tax")
+    if payload.payment_method == "CHEQUE" and (not payload.bank_name or not payload.cheque_no or not payload.cheque_date):
+        raise HTTPException(status_code=400, detail="Cheque payment requires bank name, cheque number and cheque date")
 
+    voucher_data = payload.model_dump(exclude={"expense_ids"})
+    voucher_data["expense_id"] = requested_ids[0]  # legacy compatibility / primary reference
     voucher = PaymentVoucher(
         voucher_no=next_voucher_no(db, payload.voucher_date),
-        wht_certificate_no=next_wht_no(db, payload.voucher_date) if payload.withholding_tax > 0 else None,
-        **payload.model_dump(),
+        wht_certificate_no=next_wht_no(db, payload.voucher_date) if withholding_tax > 0 else None,
+        **voucher_data,
     )
     db.add(voucher)
     db.flush()
 
-    expense.withholding_tax = payload.withholding_tax
-    expense.payment_method = payload.payment_method
-    expense.net_paid = payload.net_amount
-    expense.payment_status = "PAID"
-    expense.updated_at = datetime.utcnow()
+    for expense in expenses:
+        db.add(PaymentVoucherItem(voucher_id=voucher.id, expense_id=expense.id))
+        expense.payment_method = payload.payment_method
+        expense.net_paid = max(Decimal(expense.total_amount or 0) - Decimal(expense.withholding_tax or 0), Decimal("0"))
+        expense.payment_status = "PAID"
+        expense.updated_at = datetime.utcnow()
 
     add_audit(
         db,
@@ -398,10 +427,10 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         "CREATE",
         {
             "voucher_no": voucher.voucher_no,
-            "expense_id": voucher.expense_id,
-            "gross_amount": str(voucher.gross_amount),
-            "withholding_tax": str(voucher.withholding_tax),
-            "net_amount": str(voucher.net_amount),
+            "expense_ids": requested_ids,
+            "gross_amount": str(gross_amount),
+            "withholding_tax": str(withholding_tax),
+            "net_amount": str(net_amount),
             "wht_certificate_no": voucher.wht_certificate_no,
             "cheque_no": voucher.cheque_no,
         },
