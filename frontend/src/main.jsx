@@ -1233,34 +1233,128 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const vendor=vendors.find((x)=>x.id===v.vendor_id);
     const base=Number(e?.subtotal||v.gross_amount||0);
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
-    const copy=(label)=>`<section style="min-height:260mm;page-break-after:always">
-      <div class="head"><h2>หนังสือรับรองการหักภาษี ณ ที่จ่าย</h2><h3>ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</h3><p>${label} · เลขที่ ${v.wht_certificate_no||''}</p></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
-        <div class="line"><span style="min-width:190px">ผู้มีหน้าที่หักภาษี ณ ที่จ่าย</span><b style="white-space:nowrap">${company?.legal_name||'Sea Mountain'}</b></div>
-        <div class="line"><span style="min-width:170px">เลขประจำตัวผู้เสียภาษี</span><b style="white-space:nowrap">${company?.tax_id||'-'}</b></div>
+    const incomeLabel=v.income_type||e?.description||'อื่น ๆ';
+    const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง/i.test(incomeLabel);
+    const rowAmount=(active)=>active ? money(base) : '';
+    const rowTax=(active)=>active ? money(v.withholding_tax) : '';
+    const rowDate=(active)=>active ? thaiDate(v.voucher_date) : '';
 
-        <div class="line" style="grid-column:1/-1"><span style="min-width:120px">ที่อยู่ผู้จ่าย</span><b>${company?.address||'-'}</b></div>
-
-        <div class="line"><span style="min-width:80px">สาขา</span><b style="white-space:nowrap">${company?.branch||'-'}</b></div>
-        <div class="line"><span style="min-width:90px">โทรศัพท์</span><b style="white-space:nowrap">${company?.phone||'-'}</b></div>
-
-        <div class="line"><span style="min-width:180px">ผู้ถูกหักภาษี ณ ที่จ่าย</span><b style="white-space:nowrap">${v.payee_name}</b></div>
-        <div class="line"><span style="min-width:210px">เลขประจำตัวผู้เสียภาษี/บัตรประชาชน</span><b style="white-space:nowrap">${vendor?.tax_id||'-'}</b></div>
-
-        <div class="line" style="grid-column:1/-1"><span style="min-width:120px">ที่อยู่ผู้ถูกหัก</span><b>${vendor?.address||'-'}</b></div>
-
-        <div class="line"><span style="min-width:110px">ประเภทเงินได้</span><b>${v.income_type||e?.description||'-'}</b></div>
-        <div class="line"><span style="min-width:90px">วันที่จ่าย</span><b style="white-space:nowrap">${thaiDate(v.voucher_date)}</b></div>
-
-        <div class="line"><span style="min-width:140px">จำนวนเงินที่จ่าย</span><b style="white-space:nowrap">${money(base)}</b></div>
-        <div class="line"><span style="min-width:100px">อัตราภาษี</span><b style="white-space:nowrap">${rate.toFixed(2)}%</b></div>
-
-        <div class="line" style="grid-column:1/-1"><span style="min-width:180px">ภาษีที่หักและนำส่งไว้</span><b style="white-space:nowrap">${money(v.withholding_tax)}</b></div>
+    const copy=(copyNo, copyText)=>`
+    <section class="wht-standard">
+      <div class="wht-copy">ฉบับที่ ${copyNo} (${copyText})</div>
+      <div class="wht-title">
+        <h2>หนังสือรับรองการหักภาษี ณ ที่จ่าย</h2>
+        <h3>ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</h3>
       </div>
-      <p class="note" style="white-space:normal">ผู้จ่ายเงินรับรองว่าข้อความและตัวเลขข้างต้นถูกต้องตรงกับความเป็นจริง</p>
-      <div class="sign"><div>ผู้จัดทำ</div><div>ผู้มีอำนาจลงนาม</div><div>วันที่ออกหนังสือ</div></div>
+
+      <div class="wht-book">
+        <span>เล่มที่ <b>....................</b></span>
+        <span>เลขที่ <b>${v.wht_certificate_no||''}</b></span>
+      </div>
+
+      <div class="wht-box">
+        <b>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย :-</b>
+        <div class="wht-line"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><b>${company?.tax_id||'-'}</b></div>
+        <div class="wht-line"><span>ชื่อ</span><b>${company?.legal_name||'Sea Mountain'}</b></div>
+        <div class="wht-line"><span>ที่อยู่</span><b>${company?.address||'-'}</b></div>
+      </div>
+
+      <div class="wht-box">
+        <b>ผู้ถูกหักภาษี ณ ที่จ่าย :-</b>
+        <div class="wht-line"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><b>${vendor?.tax_id||'-'}</b></div>
+        <div class="wht-line"><span>ชื่อ</span><b>${v.payee_name}</b></div>
+        <div class="wht-line"><span>ที่อยู่</span><b>${vendor?.address||'-'}</b></div>
+      </div>
+
+      <div class="wht-ref">
+        <span>ลำดับที่ ............ ในแบบ</span>
+        <span>☐ (1) ภ.ง.ด.1ก</span>
+        <span>☐ (2) ภ.ง.ด.1ก พิเศษ</span>
+        <span>☐ (3) ภ.ง.ด.2</span>
+        <span>☐ (4) ภ.ง.ด.3</span>
+        <span>☐ (5) ภ.ง.ด.2ก</span>
+        <span>☐ (6) ภ.ง.ด.3ก</span>
+        <span>☑ (7) ภ.ง.ด.53</span>
+      </div>
+
+      <table class="wht-table">
+        <thead>
+          <tr>
+            <th>ประเภทเงินได้พึงประเมินที่จ่าย</th>
+            <th>วัน เดือน หรือปีภาษี ที่จ่าย</th>
+            <th>จำนวนเงินที่จ่าย</th>
+            <th>ภาษีที่หัก และนำส่งไว้</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1. เงินเดือน ค่าจ้าง เบี้ยเลี้ยง โบนัส ฯลฯ ตามมาตรา 40 (1)</td><td></td><td></td><td></td></tr>
+          <tr><td>2. ค่าธรรมเนียม ค่านายหน้า ฯลฯ ตามมาตรา 40 (2)</td><td></td><td></td><td></td></tr>
+          <tr><td>3. ค่าแห่งลิขสิทธิ์ ฯลฯ ตามมาตรา 40 (3)</td><td></td><td></td><td></td></tr>
+          <tr><td>4. (ก) ดอกเบี้ย ฯลฯ ตามมาตรา 40 (4) (ก)</td><td></td><td></td><td></td></tr>
+          <tr><td>4. (ข) เงินปันผล เงินส่วนแบ่งกำไร ฯลฯ ตามมาตรา 40 (4) (ข)</td><td></td><td></td><td></td></tr>
+          <tr class="${isService?'active-income':''}">
+            <td>5. การจ่ายเงินได้ที่ต้องหักภาษี ณ ที่จ่าย ตามคำสั่งกรมสรรพากรที่ออกตามมาตรา 3 เตรส เช่น ค่าจ้างทำของ ค่าโฆษณา ค่าเช่า ค่าเบี้ยประกันวินาศภัย ฯลฯ<br><b>รายละเอียด: ${incomeLabel}</b></td>
+            <td>${rowDate(isService)}</td><td>${rowAmount(isService)}</td><td>${rowTax(isService)}</td>
+          </tr>
+          <tr class="${!isService?'active-income':''}">
+            <td>6. อื่น ๆ (ระบุ) <b>${!isService?incomeLabel:''}</b></td>
+            <td>${rowDate(!isService)}</td><td>${rowAmount(!isService)}</td><td>${rowTax(!isService)}</td>
+          </tr>
+          <tr class="wht-total"><td colspan="2"><b>รวมเงินที่จ่ายและภาษีที่หักนำส่ง</b></td><td><b>${money(base)}</b></td><td><b>${money(v.withholding_tax)}</b></td></tr>
+          <tr><td><b>รวมเงินภาษีที่หักนำส่ง (ตัวอักษร)</b></td><td colspan="3">................................................................................................................</td></tr>
+        </tbody>
+      </table>
+
+      <div class="wht-funds">เงินที่จ่ายเข้า กบข./กสจ./กองทุนสงเคราะห์โรงเรียนเอกชน ............ บาท &nbsp;&nbsp; กองทุนประกันสังคม ............ บาท &nbsp;&nbsp; กองทุนสำรองเลี้ยงชีพ ............ บาท</div>
+
+      <div class="wht-payer">
+        <b>ผู้จ่ายเงิน</b>
+        <span>☑ (1) หัก ณ ที่จ่าย</span>
+        <span>☐ (2) ออกให้ตลอดไป</span>
+        <span>☐ (3) ออกให้ครั้งเดียว</span>
+        <span>☐ (4) อื่น ๆ (ระบุ) ............................</span>
+      </div>
+
+      <div class="wht-warning"><b>คำเตือน</b> ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ต้องปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
+      <div class="wht-certify">ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
+
+      <div class="wht-sign">
+        <div>ลงชื่อ ............................................................ ผู้จ่ายเงิน</div>
+        <div>............................................................</div>
+        <div>(วัน เดือน ปี ที่ออกหนังสือรับรองฯ)</div>
+        <div class="stamp">ประทับตรา<br>นิติบุคคล<br>(ถ้ามี)</div>
+      </div>
     </section>`;
-    printDocument(v.wht_certificate_no||'50 ทวิ', copy('ฉบับที่ 1 สำหรับผู้ถูกหักภาษี ณ ที่จ่าย') + copy('ฉบับที่ 2 สำหรับผู้ถูกหักภาษี ณ ที่จ่าย'));
+
+    printDocument(v.wht_certificate_no||'50 ทวิ',
+      `<style>
+        @page{size:A4 portrait;margin:8mm}
+        body{font-family:Arial,"Noto Sans Thai",sans-serif;font-size:10px}
+        .wht-standard{min-height:277mm;page-break-after:always;color:#000}
+        .wht-copy{font-size:10px;margin-bottom:2px}
+        .wht-title{text-align:center;margin:2px 0 6px}
+        .wht-title h2{font-size:18px;margin:0}.wht-title h3{font-size:12px;margin:2px 0}
+        .wht-book{display:flex;justify-content:flex-end;gap:26px;margin-bottom:4px}
+        .wht-box{border:1px solid #000;padding:5px 7px;margin-top:-1px}
+        .wht-line{display:grid;grid-template-columns:210px 1fr;gap:8px;padding:2px 0}
+        .wht-ref{border:1px solid #000;border-top:0;padding:5px 7px;display:flex;flex-wrap:wrap;gap:4px 12px}
+        .wht-table{width:100%;border-collapse:collapse;font-size:9px}
+        .wht-table th,.wht-table td{border:1px solid #000;padding:4px;vertical-align:top}
+        .wht-table th:nth-child(1){width:55%}.wht-table th:nth-child(2){width:15%}.wht-table th:nth-child(3),.wht-table th:nth-child(4){width:15%}
+        .wht-table td:nth-child(n+2){text-align:right;white-space:nowrap}
+        .wht-table .active-income td{font-weight:600}
+        .wht-total td{background:#f6f6f6}
+        .wht-funds{border:1px solid #000;border-top:0;padding:5px}
+        .wht-payer{border:1px solid #000;border-top:0;padding:5px;display:flex;flex-wrap:wrap;gap:6px 16px}
+        .wht-warning{font-size:8px;margin-top:5px}
+        .wht-certify{text-align:center;margin-top:9px}
+        .wht-sign{position:relative;width:52%;margin-left:auto;text-align:center;margin-top:8px;line-height:1.8}
+        .stamp{position:absolute;left:-100px;top:0;border:1px solid #000;border-radius:50%;width:68px;height:68px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:8px}
+        @media print{.wht-standard:last-child{page-break-after:auto}}
+      </style>` +
+      copy(1,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี') +
+      copy(2,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย เก็บไว้เป็นหลักฐาน')
+    );
   }
 
   function printCheque(v) {
