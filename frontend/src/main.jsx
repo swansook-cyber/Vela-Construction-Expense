@@ -1275,7 +1275,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 
 function ChequePreviewModal({ voucher, onClose }) {
-  const defaults = { width:190, height:82, payeeX:18, payeeY:30, dateX:146, dateY:12, amountX:146, amountY:42 };
+  const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42 };
   const [cfg,setCfg]=useState(() => {
     try { return {...defaults,...JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}')}; }
     catch { return defaults; }
