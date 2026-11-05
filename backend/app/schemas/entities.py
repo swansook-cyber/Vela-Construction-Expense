@@ -135,6 +135,12 @@ class PaymentVoucherAllocation(BaseModel):
     withholding_tax: Decimal = Decimal("0")
 
 
+class PaymentVoucherAllocationOut(PaymentVoucherAllocation):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    net_amount: Decimal
+
+
 class PaymentVoucherCreate(BaseModel):
     project_id: int
     expense_id: int | None = None
@@ -157,6 +163,7 @@ class PaymentVoucherCreate(BaseModel):
 
 class PaymentVoucherOut(PaymentVoucherCreate):
     model_config = ConfigDict(from_attributes=True)
+    allocations: list[PaymentVoucherAllocationOut] = Field(default_factory=list)
     id: int
     voucher_no: str
     wht_certificate_no: str | None = None
