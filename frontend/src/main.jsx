@@ -1800,6 +1800,13 @@ function App() {
   const [attachingExpense, setAttachingExpense] = useState(null);
   const [active, setActive] = useState('expenses');
   const [error, setError] = useState('');
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [expenseMonth, setExpenseMonth] = useState('');
+  const [expenseCostCode, setExpenseCostCode] = useState('');
+  const [expenseVendor, setExpenseVendor] = useState('');
+  const [expenseStatus, setExpenseStatus] = useState('');
+  const [expensePage, setExpensePage] = useState(1);
+  const [expensePageSize, setExpensePageSize] = useState(25);
 
   const project = projects[0];
 
@@ -1839,6 +1846,35 @@ function App() {
   const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v.name])), [vendors]);
   const costMap = useMemo(() => Object.fromEntries(costCodes.map((c) => [c.id, `${c.code} ${c.name}`])), [costCodes]);
 
+  const expenseMonths = useMemo(() => [...new Set(
+    expenses.filter((e) => e.expense_date).map((e) => String(e.expense_date).slice(0,7))
+  )].sort().reverse(), [expenses]);
+
+  const filteredExpenses = useMemo(() => {
+    const q = expenseSearch.trim().toLowerCase();
+    return expenses.filter((e) => {
+      if (expenseMonth && !String(e.expense_date || '').startsWith(expenseMonth)) return false;
+      if (expenseCostCode && String(e.cost_code_id) !== String(expenseCostCode)) return false;
+      if (expenseVendor && String(e.vendor_id || '') !== String(expenseVendor)) return false;
+      if (expenseStatus && e.payment_status !== expenseStatus) return false;
+      if (!q) return true;
+      const haystack = [
+        e.expense_no, e.document_no, e.description,
+        vendorMap[e.vendor_id], costMap[e.cost_code_id]
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [expenses, expenseSearch, expenseMonth, expenseCostCode, expenseVendor, expenseStatus, vendorMap, costMap]);
+
+  const expensePageCount = Math.max(1, Math.ceil(filteredExpenses.length / expensePageSize));
+  const currentExpensePage = Math.min(expensePage, expensePageCount);
+  const pagedExpenses = useMemo(() => {
+    const start = (currentExpensePage - 1) * expensePageSize;
+    return filteredExpenses.slice(start, start + expensePageSize);
+  }, [filteredExpenses, currentExpensePage, expensePageSize]);
+
+  useEffect(() => { setExpensePage(1); }, [expenseSearch, expenseMonth, expenseCostCode, expenseVendor, expenseStatus, expensePageSize]);
+
   const cards = [
     ['ต้นทุนตามเอกสาร', money(summary?.total_expenses)],
     ['จ่ายผู้ขายสุทธิ', money(summary?.paid_amount)],
@@ -1847,23 +1883,26 @@ function App() {
   ];
 
   return (
-    <main>
-      <header>
-        <div>
-          <p className="eyebrow">Vela Construction Expense</p>
-          <h1>{project?.name || 'Sea Mountain'}</h1>
-          <p>ระบบบันทึกค่าใช้จ่ายและเอกสารโครงการก่อสร้าง</p>
+    <main className="app-shell">
+      <header className="app-header">
+        <div className="brand-block">
+          <div className="brand-mark">SM</div>
+          <div>
+            <p className="eyebrow">Vela Construction Expense</p>
+            <h1>{project?.name || 'Sea Mountain'}</h1>
+            <p>ระบบบันทึกค่าใช้จ่ายและเอกสารโครงการก่อสร้าง</p>
+          </div>
         </div>
-        <button onClick={() => setShowExpense(true)}>+ บันทึกค่าใช้จ่าย</button>
+        <button className="primary-action" onClick={() => setShowExpense(true)}>+ บันทึกค่าใช้จ่าย</button>
       </header>
 
       {error && <div className="error banner">{error}</div>}
 
-      <section className="grid">
-        {cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}
+      <section className="metric-grid">
+        {cards.map(([label, value], index) => <article className="metric-card" key={label}><div className="metric-icon">{['฿','✓','%','◷'][index]}</div><div><span>{label}</span><strong>{value}</strong></div></article>)}
       </section>
 
-      <nav className="tabs">
+      <nav className="tabs app-nav">
         <button className={active === 'expenses' ? 'active' : ''} onClick={() => setActive('expenses')}>ค่าใช้จ่าย</button>
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
@@ -1876,32 +1915,58 @@ function App() {
       </nav>
 
       {active === 'expenses' && (
-        <section className="panel">
+        <section className="panel expense-panel">
           <div className="section-head">
-            <div><h2>รายการค่าใช้จ่าย</h2><p>{expenses.length} รายการ</p></div>
+            <div><h2>รายการค่าใช้จ่าย</h2><p>แสดง {filteredExpenses.length} จาก {expenses.length} รายการ</p></div>
             <button onClick={() => setShowExpense(true)}>+ เพิ่มรายการ</button>
           </div>
-          <div className="table-wrap">
-            <table>
+
+          <div className="expense-toolbar">
+            <div className="search-box">
+              <span>⌕</span>
+              <input value={expenseSearch} onChange={(e)=>setExpenseSearch(e.target.value)} placeholder="ค้นหาเลขรายการ เอกสาร รายละเอียด หรือผู้ขาย..." />
+            </div>
+            <select value={expenseMonth} onChange={(e)=>setExpenseMonth(e.target.value)}>
+              <option value="">ทุกเดือน</option>
+              {expenseMonths.map((m)=><option key={m} value={m}>{new Intl.DateTimeFormat('th-TH',{month:'long',year:'numeric'}).format(new Date(Number(m.slice(0,4)),Number(m.slice(5,7))-1,1))}</option>)}
+            </select>
+            <select value={expenseCostCode} onChange={(e)=>setExpenseCostCode(e.target.value)}>
+              <option value="">ทุก Cost Code</option>
+              {costCodes.map((c)=><option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+            </select>
+            <select value={expenseVendor} onChange={(e)=>setExpenseVendor(e.target.value)}>
+              <option value="">ทุกผู้ขาย</option>
+              {vendors.map((v)=><option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+            <select value={expenseStatus} onChange={(e)=>setExpenseStatus(e.target.value)}>
+              <option value="">ทุกสถานะ</option>
+              <option value="PAID">จ่ายแล้ว</option>
+              <option value="UNPAID">ยังไม่จ่าย</option>
+              <option value="PARTIAL">บางส่วน</option>
+              <option value="VOID">ยกเลิก</option>
+            </select>
+            <button className="ghost filter-reset" onClick={()=>{setExpenseSearch('');setExpenseMonth('');setExpenseCostCode('');setExpenseVendor('');setExpenseStatus('')}}>ล้าง</button>
+          </div>
+
+          <div className="table-wrap expense-table-wrap">
+            <table className="expense-table">
               <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ยอด</th><th>เอกสาร</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
               <tbody>
-                {expenses.length === 0 && <tr><td colSpan="9" className="empty">ยังไม่มีค่าใช้จ่าย — เพิ่มรายการแรกของ Sea Mountain ได้เลย</td></tr>}
-                {expenses.map((e) => (
+                {pagedExpenses.length === 0 && <tr><td colSpan="9" className="empty">ไม่พบรายการตามเงื่อนไขที่เลือก</td></tr>}
+                {pagedExpenses.map((e) => (
                   <tr key={e.id}>
-                    <td>{e.expense_date}</td>
-                    <td className="mono">{e.expense_no}</td>
-                    <td>{e.description}</td>
-                    <td>{costMap[e.cost_code_id] || '-'}</td>
-                    <td>{vendorMap[e.vendor_id] || '-'}</td>
-                    <td className="amount">{money(e.total_amount)}</td>
-                    <td>{e.paperless_document_id ? <span className="status paid">DOC #{e.paperless_document_id}</span> : (e.document_task_id ? <span className="status partial">OCR</span> : '-')}</td>
-                    <td><span className={`status ${e.payment_status.toLowerCase()}`}>{({UNPAID:'ยังไม่จ่าย',PARTIAL:'บางส่วน',PAID:'จ่ายแล้ว',VOID:'ยกเลิก'})[e.payment_status]}</span></td>
-                    <td>
+                    <td data-label="วันที่">{thaiDate(e.expense_date)}</td>
+                    <td data-label="เลขรายการ" className="mono">{e.expense_no}</td>
+                    <td data-label="รายละเอียด" className="expense-desc">{e.description}</td>
+                    <td data-label="หมวดงาน">{costMap[e.cost_code_id] || '-'}</td>
+                    <td data-label="ผู้ขาย">{vendorMap[e.vendor_id] || '-'}</td>
+                    <td data-label="ยอด" className="amount">{money(e.total_amount)}</td>
+                    <td data-label="เอกสาร">{e.paperless_document_id ? <span className="status paid">DOC #{e.paperless_document_id}</span> : (e.document_task_id ? <span className="status partial">OCR</span> : '-')}</td>
+                    <td data-label="สถานะ"><span className={`status ${e.payment_status.toLowerCase()}`}>{({UNPAID:'ยังไม่จ่าย',PARTIAL:'บางส่วน',PAID:'จ่ายแล้ว',VOID:'ยกเลิก'})[e.payment_status]}</span></td>
+                    <td data-label="จัดการ">
                       <div className="row-actions">
                         <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}>แก้ไข</button>
-                        <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}>
-                          {e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}
-                        </button>
+                        <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}>{e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}</button>
                         <button className="mini danger" disabled={e.payment_status === 'VOID'} onClick={() => voidExpense(e)}>ยกเลิก</button>
                       </div>
                     </td>
@@ -1909,6 +1974,21 @@ function App() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="pagination-bar">
+            <div className="page-size">แสดง
+              <select value={expensePageSize} onChange={(e)=>setExpensePageSize(Number(e.target.value))}>
+                <option value="25">25</option><option value="50">50</option><option value="100">100</option>
+              </select>
+              รายการ
+            </div>
+            <div className="page-info">{filteredExpenses.length ? ((currentExpensePage-1)*expensePageSize+1) : 0}–{Math.min(currentExpensePage*expensePageSize,filteredExpenses.length)} จาก {filteredExpenses.length}</div>
+            <div className="page-buttons">
+              <button className="ghost mini" disabled={currentExpensePage<=1} onClick={()=>setExpensePage((p)=>Math.max(1,p-1))}>‹ ก่อนหน้า</button>
+              <span>หน้า {currentExpensePage} / {expensePageCount}</span>
+              <button className="ghost mini" disabled={currentExpensePage>=expensePageCount} onClick={()=>setExpensePage((p)=>Math.min(expensePageCount,p+1))}>ถัดไป ›</button>
+            </div>
           </div>
         </section>
       )}
