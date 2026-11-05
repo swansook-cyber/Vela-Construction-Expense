@@ -1403,57 +1403,62 @@ function printDocument(title, html) {
 }
 
 function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, onSaved }) {
-  const used = new Set(vouchers.map((v) => v.expense_id));
+  const used = new Set(vouchers.flatMap((v) => (v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []))));
   const eligible = expenses.filter((e) => e.payment_status !== 'VOID' && !used.has(e.id));
-  const [expenseId, setExpenseId] = useState(eligible[0]?.id || '');
-  const selected = eligible.find((e) => String(e.id) === String(expenseId));
-  const vendor = vendors.find((v) => v.id === selected?.vendor_id);
+  const vendorIds = [...new Set(eligible.map((e) => e.vendor_id).filter(Boolean))];
+  const [vendorId, setVendorId] = useState(vendorIds[0] || '');
+  const vendor = vendors.find((v) => String(v.id) === String(vendorId));
+  const vendorExpenses = eligible.filter((e) => String(e.vendor_id || '') === String(vendorId || ''));
+  const [selectedIds, setSelectedIds] = useState(() => vendorExpenses[0]?.id ? [vendorExpenses[0].id] : []);
+  const selectedExpenses = vendorExpenses.filter((e) => selectedIds.includes(e.id));
+
   const [form, setForm] = useState({
     voucher_date: today(),
-    whtRate: selected?.withholding_tax && Number(selected.subtotal) ? String(Math.round(Number(selected.withholding_tax) / Number(selected.subtotal) * 100)) : '0',
-    payment_method: selected?.payment_method || 'TRANSFER',
+    payment_method: 'TRANSFER',
     payee_name: vendor?.name || '',
-    income_type: 'ค่าบริการ/ค่าจ้าง',
     cheque_no: '',
     cheque_date: today(),
     bank_name: 'ธนาคารไทยพาณิชย์',
     notes: '',
   });
   const [error, setError] = useState('');
+  const set = (k,v) => setForm((x) => ({...x,[k]:v}));
 
   useEffect(() => {
-    const e = eligible.find((x) => String(x.id) === String(expenseId));
-    const v = vendors.find((x) => x.id === e?.vendor_id);
+    const first = vendorExpenses[0];
+    setSelectedIds(first ? [first.id] : []);
     setForm((old) => ({
       ...old,
-      payee_name: v?.name || e?.description || '',
-      payment_method: e?.payment_method || old.payment_method || 'TRANSFER',
-      whtRate: e?.withholding_tax && Number(e.subtotal) ? String(Math.round(Number(e.withholding_tax) / Number(e.subtotal) * 100)) : '0',
+      payee_name: vendor?.name || '',
+      payment_method: first?.payment_method || old.payment_method || 'TRANSFER',
     }));
-  }, [expenseId]);
+  }, [vendorId]);
 
-  const subtotal = Number(selected?.subtotal || 0);
-  const gross = Number(selected?.total_amount || 0);
-  const wht = subtotal * Number(form.whtRate || 0) / 100;
-  const net = Math.max(gross - wht, 0);
-  const set = (k,v) => setForm((x) => ({...x,[k]:v}));
+  const gross = selectedExpenses.reduce((sum,e)=>sum + Number(e.total_amount || 0),0);
+  const wht = selectedExpenses.reduce((sum,e)=>sum + Number(e.withholding_tax || 0),0);
+  const net = Math.max(gross - wht,0);
+
+  function toggleExpense(id) {
+    setSelectedIds((ids) => ids.includes(id) ? ids.filter((x)=>x!==id) : [...ids,id]);
+  }
 
   async function submit(e) {
     e.preventDefault();
-    if (!selected || !project) return;
+    if (!project || !vendor || selectedExpenses.length === 0) return;
     setError('');
     try {
       await api('/payment-vouchers', {
         method:'POST',
         body: JSON.stringify({
           project_id: project.id,
-          expense_id: selected.id,
-          vendor_id: selected.vendor_id || null,
+          expense_id: selectedExpenses[0].id,
+          expense_ids: selectedExpenses.map((e)=>e.id),
+          vendor_id: vendor.id,
           voucher_date: form.voucher_date,
           gross_amount: gross.toFixed(2),
           withholding_tax: wht.toFixed(2),
-          wht_rate: Number(form.whtRate || 0).toFixed(2),
-          income_type: form.income_type || null,
+          wht_rate: null,
+          income_type: selectedExpenses.length > 1 ? 'รวมตามบิล/ใบวางบิล' : null,
           net_amount: net.toFixed(2),
           payment_method: form.payment_method || null,
           payee_name: form.payee_name,
@@ -1469,30 +1474,28 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 
   return <div className="modal-backdrop" onMouseDown={onClose}>
     <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
-      <div className="modal-head"><div><p className="eyebrow">Payment Voucher</p><h2>ออกใบสำคัญจ่าย</h2></div><button className="ghost icon" onClick={onClose}>×</button></div>
+      <div className="modal-head"><div><p className="eyebrow">Payment Voucher</p><h2>ออกใบสำคัญจ่าย</h2><p>รวมหลายบิลของผู้ขายเดียวกันได้</p></div><button className="ghost icon" onClick={onClose}>×</button></div>
       <form className="form-grid" onSubmit={submit}>
-        <label className="wide">รายการค่าใช้จ่าย
-          <select value={expenseId} onChange={(e)=>setExpenseId(e.target.value)} required>
-            {eligible.length===0 && <option value="">ไม่มีรายการที่รอออกใบสำคัญจ่าย</option>}
-            {eligible.map((e)=><option key={e.id} value={e.id}>{e.expense_no} — {e.description} — {money(e.total_amount)}</option>)}
+        <label className="wide">ผู้ขาย / ผู้รับเหมา
+          <select value={vendorId} onChange={(e)=>setVendorId(e.target.value)} required>
+            {vendorIds.length===0 && <option value="">ไม่มีบิลที่รอออกใบสำคัญจ่าย</option>}
+            {vendorIds.map((id)=>{const v=vendors.find((x)=>x.id===id);return <option key={id} value={id}>{v?.name||'-'}</option>})}
           </select>
         </label>
+
+        <div className="wide voucher-bill-picker">
+          <div className="voucher-bill-head"><b>เลือกบิลตามใบวางบิล</b><span>{selectedExpenses.length} รายการ</span></div>
+          {vendorExpenses.length===0 && <div className="empty">ไม่มีบิลของผู้ขายรายนี้ที่รอจ่าย</div>}
+          {vendorExpenses.map((e)=><label key={e.id} className="voucher-bill-row">
+            <input type="checkbox" checked={selectedIds.includes(e.id)} onChange={()=>toggleExpense(e.id)} />
+            <span className="voucher-bill-main"><b>{e.document_no||e.expense_no}</b><small>{thaiDate(e.expense_date)} · {e.description}</small></span>
+            <span className="amount">{money(e.total_amount)}</span>
+            <span className="voucher-bill-wht">WHT {money(e.withholding_tax)}</span>
+          </label>)}
+        </div>
+
         <label>วันที่ใบสำคัญจ่าย<input type="date" value={form.voucher_date} onChange={(e)=>set('voucher_date',e.target.value)} required /></label>
         <label>ผู้รับเงิน<input value={form.payee_name} onChange={(e)=>set('payee_name',e.target.value)} required /></label>
-        <label>หัก ณ ที่จ่าย
-          <select value={form.whtRate} onChange={(e)=>set('whtRate',e.target.value)}>
-            <option value="0">ไม่หัก</option><option value="1">1%</option><option value="3">3%</option><option value="5">5%</option>
-          </select>
-        </label>
-        <label>ประเภทเงินได้
-          <select value={form.income_type} onChange={(e)=>set('income_type',e.target.value)}>
-            <option>ค่าบริการ/ค่าจ้าง</option>
-            <option>ค่าเช่า</option>
-            <option>ค่าขนส่ง</option>
-            <option>ค่าโฆษณา</option>
-            <option>อื่นๆ</option>
-          </select>
-        </label>
         <label>วิธีจ่าย
           <select value={form.payment_method} onChange={(e)=>set('payment_method',e.target.value)}>
             <option value="TRANSFER">โอน</option><option value="CASH">เงินสด</option><option value="CHEQUE">เช็ค</option>
@@ -1509,11 +1512,14 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
         </>}
         <div className="calc wide">
-          <span>ยอดเอกสาร <b>{money(gross)}</b></span><span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span><span className="total-line">จ่ายสุทธิ <b>{money(net)}</b></span>
+          <span>รวมบิล <b>{selectedExpenses.length} รายการ</b></span>
+          <span>ยอดเอกสาร <b>{money(gross)}</b></span>
+          <span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span>
+          <span className="total-line">ยอดเช็ค / จ่ายสุทธิ <b>{money(net)}</b></span>
         </div>
-        <label className="wide">หมายเหตุ<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} /></label>
+        <label className="wide">หมายเหตุ / เลขใบวางบิล<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} placeholder="เช่น ใบวางบิลเลขที่ ..." /></label>
         {error && <div className="error wide">{error}</div>}
-        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button disabled={!selected}>ออกใบสำคัญจ่าย</button></div>
+        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button disabled={!vendor || selectedExpenses.length===0}>ออกใบสำคัญจ่าย</button></div>
       </form>
     </div>
   </div>;
