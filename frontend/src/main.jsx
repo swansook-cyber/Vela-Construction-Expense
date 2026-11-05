@@ -1416,7 +1416,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
     income_type: 'ค่าบริการ/ค่าจ้าง',
     cheque_no: '',
     cheque_date: today(),
-    bank_name: '',
+    bank_name: 'ธนาคารไทยพาณิชย์',
     notes: '',
   });
   const [error, setError] = useState('');
@@ -1499,7 +1499,12 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           </select>
         </label>
         {form.payment_method==='CHEQUE' && <>
-          <label>ธนาคาร<input value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} required /></label>
+          <label>ธนาคาร
+            <select value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} required>
+              <option value="ธนาคารไทยพาณิชย์">ไทยพาณิชย์</option>
+              <option value="ธนาคารกรุงศรีอยุธยา">กรุงศรี</option>
+            </select>
+          </label>
           <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} required /></label>
           <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
         </>}
@@ -1518,7 +1523,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 function PaymentEditModal({ voucher, onClose, onSaved }) {
   const [form,setForm]=useState({
     payment_method:voucher.payment_method||'TRANSFER',
-    bank_name:voucher.bank_name||'',
+    bank_name:voucher.bank_name||'ธนาคารไทยพาณิชย์',
     cheque_no:voucher.cheque_no||'',
     cheque_date:voucher.cheque_date||today(),
     notes:voucher.notes||''
@@ -1549,7 +1554,12 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
           <option value="TRANSFER">โอน</option><option value="CASH">เงินสด</option><option value="CHEQUE">เช็ค</option>
         </select></label>
         {form.payment_method==='CHEQUE' && <>
-          <label>ธนาคาร<input value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} required /></label>
+          <label>ธนาคาร
+            <select value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} required>
+              <option value="ธนาคารไทยพาณิชย์">ไทยพาณิชย์</option>
+              <option value="ธนาคารกรุงศรีอยุธยา">กรุงศรี</option>
+            </select>
+          </label>
           <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} required /></label>
           <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
         </>}
