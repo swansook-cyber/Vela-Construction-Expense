@@ -1234,7 +1234,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const base=Number(e?.subtotal||v.gross_amount||0);
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
     const incomeLabel=v.income_type||e?.description||'อื่น ๆ';
-    const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง/i.test(incomeLabel);
+    const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง|ก่อสร้าง|ซ่อม|ทาสี|มุงหลังคา|ติดตั้ง|ปรับปรุง/i.test(incomeLabel);
     const rowAmount=(active)=>active ? money(base) : '';
     const rowTax=(active)=>active ? money(v.withholding_tax) : '';
     const rowDate=(active)=>active ? thaiDate(v.voucher_date) : '';
