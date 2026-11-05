@@ -1096,6 +1096,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
     whtRate: selected?.withholding_tax && Number(selected.subtotal) ? String(Math.round(Number(selected.withholding_tax) / Number(selected.subtotal) * 100)) : '0',
     payment_method: selected?.payment_method || 'TRANSFER',
     payee_name: vendor?.name || '',
+    income_type: 'ค่าบริการ/ค่าจ้าง',
     cheque_no: '',
     cheque_date: today(),
     bank_name: '',
@@ -1134,6 +1135,8 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           voucher_date: form.voucher_date,
           gross_amount: gross.toFixed(2),
           withholding_tax: wht.toFixed(2),
+          wht_rate: Number(form.whtRate || 0).toFixed(2),
+          income_type: form.income_type || null,
           net_amount: net.toFixed(2),
           payment_method: form.payment_method || null,
           payee_name: form.payee_name,
@@ -1164,6 +1167,15 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
             <option value="0">ไม่หัก</option><option value="1">1%</option><option value="3">3%</option><option value="5">5%</option>
           </select>
         </label>
+        <label>ประเภทเงินได้
+          <select value={form.income_type} onChange={(e)=>set('income_type',e.target.value)}>
+            <option>ค่าบริการ/ค่าจ้าง</option>
+            <option>ค่าเช่า</option>
+            <option>ค่าขนส่ง</option>
+            <option>ค่าโฆษณา</option>
+            <option>อื่นๆ</option>
+          </select>
+        </label>
         <label>วิธีจ่าย
           <select value={form.payment_method} onChange={(e)=>set('payment_method',e.target.value)}>
             <option value="TRANSFER">โอน</option><option value="CASH">เงินสด</option><option value="CHEQUE">เช็ค</option>
@@ -1187,12 +1199,18 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 
 function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) {
   const [vouchers,setVouchers]=useState([]);
+  const [company,setCompany]=useState(null);
   const [showCreate,setShowCreate]=useState(false);
   const expenseMap=useMemo(()=>Object.fromEntries(expenses.map((e)=>[e.id,e])),[expenses]);
 
   async function load() {
     if (!project?.id) return;
-    setVouchers(await api(`/payment-vouchers?project_id=${project.id}`));
+    const [voucherRows, companyProfile] = await Promise.all([
+      api(`/payment-vouchers?project_id=${project.id}`),
+      api('/company-profile'),
+    ]);
+    setVouchers(voucherRows);
+    setCompany(companyProfile);
   }
   useEffect(()=>{ load(); },[project?.id]);
 
@@ -1202,7 +1220,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
 
   function printVoucher(v) {
     const e=expenseMap[v.expense_id];
-    printDocument(v.voucher_no,`<div class="head"><h2>Sea Mountain</h2><h3>ใบสำคัญจ่าย</h3><p>${v.voucher_no}</p></div>
+    printDocument(v.voucher_no,`<div class="head"><h2>${company?.legal_name||'Sea Mountain'}</h2><h3>ใบสำคัญจ่าย</h3><p>${v.voucher_no}</p></div>
       <div class="meta"><div class="line"><span>วันที่</span><b>${thaiDate(v.voucher_date)}</b></div><div class="line"><span>ผู้รับเงิน</span><b>${v.payee_name}</b></div>
       <div class="line"><span>รายการ</span><b>${e?.description||''}</b></div><div class="line"><span>เลขที่เอกสาร</span><b>${e?.document_no||'-'}</b></div>
       <div class="line"><span>ยอดเอกสาร</span><b>${money(v.gross_amount)}</b></div><div class="line"><span>หัก ณ ที่จ่าย</span><b>${money(v.withholding_tax)}</b></div></div>
@@ -1212,12 +1230,30 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
 
   function printWht(v) {
     const e=expenseMap[v.expense_id];
-    printDocument(v.wht_certificate_no||'WHT',`<div class="head"><h2>Sea Mountain</h2><h3>ใบรับรองการหักภาษี ณ ที่จ่าย</h3><p>${v.wht_certificate_no||''}</p></div>
-      <div class="meta"><div class="line"><span>ผู้ถูกหักภาษี</span><b>${v.payee_name}</b></div><div class="line"><span>วันที่</span><b>${thaiDate(v.voucher_date)}</b></div>
-      <div class="line"><span>รายละเอียด</span><b>${e?.description||''}</b></div><div class="line"><span>ฐานจ่าย</span><b>${money(e?.subtotal||v.gross_amount)}</b></div>
-      <div class="line"><span>ภาษีหัก ณ ที่จ่าย</span><b>${money(v.withholding_tax)}</b></div></div>
-      <p class="note">แบบพิมพ์ภายในระบบ กรุณาตรวจข้อมูลผู้จ่าย/ผู้รับและข้อกำหนดภาษีก่อนใช้ออกเอกสารทางการ</p>
-      <div class="sign"><div>ผู้จัดทำ</div><div>ผู้มีอำนาจลงนาม</div><div>ผู้รับเอกสาร</div></div>`);
+    const vendor=vendors.find((x)=>x.id===v.vendor_id);
+    const base=Number(e?.subtotal||v.gross_amount||0);
+    const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
+    const copy=(label)=>`<section style="min-height:260mm;page-break-after:always">
+      <div class="head"><h2>หนังสือรับรองการหักภาษี ณ ที่จ่าย</h2><h3>ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</h3><p>${label} · เลขที่ ${v.wht_certificate_no||''}</p></div>
+      <div class="meta">
+        <div class="line"><span>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย</span><b>${company?.legal_name||'Sea Mountain'}</b></div>
+        <div class="line"><span>เลขประจำตัวผู้เสียภาษี</span><b>${company?.tax_id||'-'}</b></div>
+        <div class="line" style="grid-column:1/-1"><span>ที่อยู่ผู้จ่าย</span><b>${company?.address||'-'}</b></div>
+        <div class="line"><span>สาขา</span><b>${company?.branch||'-'}</b></div>
+        <div class="line"><span>โทรศัพท์</span><b>${company?.phone||'-'}</b></div>
+        <div class="line"><span>ผู้ถูกหักภาษี ณ ที่จ่าย</span><b>${v.payee_name}</b></div>
+        <div class="line"><span>เลขประจำตัวผู้เสียภาษี/บัตรประชาชน</span><b>${vendor?.tax_id||'-'}</b></div>
+        <div class="line" style="grid-column:1/-1"><span>ที่อยู่ผู้ถูกหัก</span><b>${vendor?.address||'-'}</b></div>
+        <div class="line"><span>ประเภทเงินได้</span><b>${v.income_type||e?.description||'-'}</b></div>
+        <div class="line"><span>วันที่จ่าย</span><b>${thaiDate(v.voucher_date)}</b></div>
+        <div class="line"><span>จำนวนเงินที่จ่าย</span><b>${money(base)}</b></div>
+        <div class="line"><span>อัตราภาษี</span><b>${rate.toFixed(2)}%</b></div>
+        <div class="line"><span>ภาษีที่หักและนำส่งไว้</span><b>${money(v.withholding_tax)}</b></div>
+      </div>
+      <p class="note">ผู้จ่ายเงินรับรองว่าข้อความและตัวเลขข้างต้นถูกต้องตรงกับความเป็นจริง</p>
+      <div class="sign"><div>ผู้จัดทำ</div><div>ผู้มีอำนาจลงนาม</div><div>วันที่ออกหนังสือ</div></div>
+    </section>`;
+    printDocument(v.wht_certificate_no||'50 ทวิ', copy('ฉบับที่ 1 สำหรับผู้ถูกหักภาษี ณ ที่จ่าย') + copy('ฉบับที่ 2 สำหรับผู้ถูกหักภาษี ณ ที่จ่าย'));
   }
 
   function printCheque(v) {
@@ -1242,6 +1278,43 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
   </section>;
 }
 
+
+
+function CompanySettingsPanel() {
+  const [form,setForm]=useState({legal_name:'Sea Mountain',tax_id:'',address:'',branch:'',phone:''});
+  const [saved,setSaved]=useState('');
+  const [error,setError]=useState('');
+
+  useEffect(()=>{ api('/company-profile').then((p)=>setForm({
+    legal_name:p.legal_name||'Sea Mountain', tax_id:p.tax_id||'', address:p.address||'',
+    branch:p.branch||'', phone:p.phone||''
+  })).catch((e)=>setError(e.message)); },[]);
+
+  const set=(k,v)=>setForm((x)=>({...x,[k]:v}));
+  async function submit(e){
+    e.preventDefault(); setError(''); setSaved('');
+    try{
+      await api('/company-profile',{method:'PUT',body:JSON.stringify({
+        legal_name:form.legal_name, tax_id:form.tax_id||null, address:form.address||null,
+        branch:form.branch||null, phone:form.phone||null
+      })});
+      setSaved('บันทึกข้อมูลบริษัทแล้ว');
+    }catch(err){setError(err.message);}
+  }
+  return <section className="panel">
+    <div className="section-head"><div><h2>ตั้งค่าบริษัท</h2><p>ข้อมูลผู้จ่ายสำหรับใบสำคัญจ่ายและหนังสือรับรอง 50 ทวิ</p></div></div>
+    <form className="form-grid" onSubmit={submit}>
+      <label>ชื่อจดทะเบียน<input value={form.legal_name} onChange={(e)=>set('legal_name',e.target.value)} required /></label>
+      <label>เลขประจำตัวผู้เสียภาษี<input value={form.tax_id} onChange={(e)=>set('tax_id',e.target.value)} /></label>
+      <label>สาขา<input value={form.branch} onChange={(e)=>set('branch',e.target.value)} placeholder="สำนักงานใหญ่ / สาขา 00001" /></label>
+      <label>โทรศัพท์<input value={form.phone} onChange={(e)=>set('phone',e.target.value)} /></label>
+      <label className="wide">ที่อยู่<textarea rows="3" value={form.address} onChange={(e)=>set('address',e.target.value)} /></label>
+      {error&&<div className="error wide">{error}</div>}
+      {saved&&<div className="wide status paid">{saved}</div>}
+      <div className="actions wide"><button>บันทึกข้อมูลบริษัท</button></div>
+    </form>
+  </section>;
+}
 
 function App() {
   const [projects, setProjects] = useState([]);
@@ -1327,6 +1400,7 @@ function App() {
         <button className={active === 'voucher' ? 'active' : ''} onClick={() => setActive('voucher')}>ใบสำคัญจ่าย</button>
         <button className={active === 'cheque' ? 'active' : ''} onClick={() => setActive('cheque')}>พิมพ์เช็ค</button>
         <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
+        <button className={active === 'settings' ? 'active' : ''} onClick={() => setActive('settings')}>ตั้งค่าบริษัท</button>
         <button className={active === 'audit' ? 'active' : ''} onClick={() => setActive('audit')}>Audit Log</button>
       </nav>
 
@@ -1393,6 +1467,7 @@ function App() {
       {active === 'voucher' && <PaymentDocumentsPanel mode="voucher" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
       {active === 'cheque' && <PaymentDocumentsPanel mode="cheque" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
       {active === 'reports' && <ReportPanel project={project} expenses={expenses} costCodes={costCodes} vendors={vendors} />}
+      {active === 'settings' && <CompanySettingsPanel />}
       {active === 'audit' && <AuditPanel />}
 
       {active === 'codes' && (
