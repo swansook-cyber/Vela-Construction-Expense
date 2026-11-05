@@ -72,6 +72,38 @@ class Expense(Base):
     vendor = relationship("Vendor")
 
 
+class PaymentVoucher(Base):
+    __tablename__ = "payment_vouchers"
+    __table_args__ = (
+        UniqueConstraint("voucher_no", name="uq_payment_voucher_no"),
+        UniqueConstraint("expense_id", name="uq_payment_voucher_expense"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    voucher_no: Mapped[str] = mapped_column(String(40), index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    expense_id: Mapped[int] = mapped_column(ForeignKey("expenses.id"), index=True)
+    vendor_id: Mapped[int | None] = mapped_column(ForeignKey("vendors.id"), nullable=True, index=True)
+    voucher_date: Mapped[date] = mapped_column(Date)
+    gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    net_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    payee_name: Mapped[str] = mapped_column(String(255))
+    wht_certificate_no: Mapped[str | None] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    cheque_no: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    cheque_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    bank_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="ISSUED")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("Project")
+    expense = relationship("Expense")
+    vendor = relationship("Vendor")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
