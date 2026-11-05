@@ -1414,15 +1414,47 @@ function printDocument(title, html) {
 }
 
 function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, onSaved }) {
-  const used = new Set(vouchers.flatMap((v) => (v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []))));
-  const eligible = expenses.filter((e) => e.payment_status !== 'VOID' && !used.has(e.id));
+  const allocationsByExpense = useMemo(() => {
+    const rows = {};
+    vouchers.forEach((v) => {
+      const allocations = v.allocations?.length
+        ? v.allocations
+        : (v.expense_id ? [{ expense_id:v.expense_id, gross_amount:v.gross_amount, withholding_tax:v.withholding_tax, net_amount:v.net_amount }] : []);
+      allocations.forEach((a) => {
+        if (!rows[a.expense_id]) rows[a.expense_id] = [];
+        rows[a.expense_id].push(a);
+      });
+    });
+    return rows;
+  }, [vouchers]);
+
+  const expenseMeta = useMemo(() => Object.fromEntries(expenses.map((e) => {
+    const prior = allocationsByExpense[e.id] || [];
+    const paidGross = prior.reduce((sum,a)=>sum + Number(a.gross_amount||0),0);
+    const paidWht = prior.reduce((sum,a)=>sum + Number(a.withholding_tax||0),0);
+    const total = Number(e.total_amount||0);
+    const subtotal = Number(e.subtotal||0);
+    const remaining = Math.max(total-paidGross,0);
+    const priorTaxBase = prior.reduce((sum,a)=>sum + (total ? Number(a.gross_amount||0) * subtotal / total : Number(a.gross_amount||0)),0);
+    const inferredRate = priorTaxBase > 0
+      ? paidWht / priorTaxBase * 100
+      : (subtotal > 0 && Number(e.withholding_tax||0) > 0 ? Number(e.withholding_tax||0) / subtotal * 100 : 0);
+    return [e.id,{paidGross,paidWht,remaining,inferredRate}];
+  })), [expenses,allocationsByExpense]);
+
+  const eligible = expenses.filter((e) => e.payment_status !== 'VOID' && (expenseMeta[e.id]?.remaining||0) > 0.009);
   const vendorIds = [...new Set(eligible.map((e) => e.vendor_id).filter(Boolean))];
   const [vendorId, setVendorId] = useState(vendorIds[0] || '');
   const vendor = vendors.find((v) => String(v.id) === String(vendorId));
   const vendorExpenses = eligible.filter((e) => String(e.vendor_id || '') === String(vendorId || ''));
-  const [selectedIds, setSelectedIds] = useState(() => vendorExpenses[0]?.id ? [vendorExpenses[0].id] : []);
-  const selectedExpenses = vendorExpenses.filter((e) => selectedIds.includes(e.id));
 
+  const makeDraft = (e) => ({
+    selected:true,
+    amount:Number((expenseMeta[e.id]?.remaining||0).toFixed(2)),
+    whtRate:[0,1,3,5].reduce((best,r)=>Math.abs(r-(expenseMeta[e.id]?.inferredRate||0))<Math.abs(best-(expenseMeta[e.id]?.inferredRate||0))?r:best,0)
+  });
+
+  const [drafts,setDrafts]=useState(() => vendorExpenses[0] ? {[vendorExpenses[0].id]:makeDraft(vendorExpenses[0])} : {});
   const [form, setForm] = useState({
     voucher_date: today(),
     payment_method: 'TRANSFER',
@@ -1437,7 +1469,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 
   useEffect(() => {
     const first = vendorExpenses[0];
-    setSelectedIds(first ? [first.id] : []);
+    setDrafts(first ? {[first.id]:makeDraft(first)} : {});
     setForm((old) => ({
       ...old,
       payee_name: vendor?.name || '',
@@ -1445,25 +1477,48 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
     }));
   }, [vendorId]);
 
-  const gross = selectedExpenses.reduce((sum,e)=>sum + Number(e.total_amount || 0),0);
-  const wht = selectedExpenses.reduce((sum,e)=>sum + Number(e.withholding_tax || 0),0);
-  const net = Math.max(gross - wht,0);
+  const selectedExpenses = vendorExpenses.filter((e)=>drafts[e.id]?.selected);
+  const allocations = selectedExpenses.map((e)=>{
+    const draft=drafts[e.id];
+    const amount=Math.max(0,Math.min(Number(draft?.amount||0),expenseMeta[e.id]?.remaining||0));
+    const total=Number(e.total_amount||0);
+    const subtotal=Number(e.subtotal||0);
+    const taxBase=total ? amount*subtotal/total : amount;
+    const wht=taxBase*Number(draft?.whtRate||0)/100;
+    return {expense:e,gross:amount,wht,net:Math.max(amount-wht,0),taxBase};
+  }).filter((x)=>x.gross>0);
 
-  function toggleExpense(id) {
-    setSelectedIds((ids) => ids.includes(id) ? ids.filter((x)=>x!==id) : [...ids,id]);
+  const gross = allocations.reduce((sum,x)=>sum+x.gross,0);
+  const wht = allocations.reduce((sum,x)=>sum+x.wht,0);
+  const net = allocations.reduce((sum,x)=>sum+x.net,0);
+
+  function toggleExpense(e) {
+    setDrafts((rows)=>{
+      const current=rows[e.id];
+      if(current) return {...rows,[e.id]:{...current,selected:!current.selected}};
+      return {...rows,[e.id]:makeDraft(e)};
+    });
+  }
+  function updateDraft(id,key,value){
+    setDrafts((rows)=>({...rows,[id]:{...(rows[id]||{selected:true}),[key]:value}}));
   }
 
   async function submit(e) {
     e.preventDefault();
-    if (!project || !vendor || selectedExpenses.length === 0) return;
+    if (!project || !vendor || allocations.length === 0) return;
     setError('');
     try {
       await api('/payment-vouchers', {
         method:'POST',
         body: JSON.stringify({
           project_id: project.id,
-          expense_id: selectedExpenses[0].id,
-          expense_ids: selectedExpenses.map((e)=>e.id),
+          expense_id: allocations[0].expense.id,
+          expense_ids: allocations.map((x)=>x.expense.id),
+          allocations: allocations.map((x)=>({
+            expense_id:x.expense.id,
+            gross_amount:x.gross.toFixed(2),
+            withholding_tax:x.wht.toFixed(2),
+          })),
           vendor_id: vendor.id,
           voucher_date: form.voucher_date,
           gross_amount: gross.toFixed(2),
@@ -1485,24 +1540,39 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 
   return <div className="modal-backdrop" onMouseDown={onClose}>
     <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
-      <div className="modal-head"><div><p className="eyebrow">Payment Voucher</p><h2>ออกใบสำคัญจ่าย</h2><p>รวมหลายบิลของผู้ขายเดียวกันได้</p></div><button className="ghost icon" onClick={onClose}>×</button></div>
+      <div className="modal-head"><div><p className="eyebrow">Payment Voucher</p><h2>ออกใบสำคัญจ่าย</h2><p>รวมหลายบิล และแบ่งจ่ายเป็นงวดได้</p></div><button className="ghost icon" onClick={onClose}>×</button></div>
       <form className="form-grid" onSubmit={submit}>
         <label className="wide">ผู้ขาย / ผู้รับเหมา
           <select value={vendorId} onChange={(e)=>setVendorId(e.target.value)} required>
-            {vendorIds.length===0 && <option value="">ไม่มีบิลที่รอออกใบสำคัญจ่าย</option>}
+            {vendorIds.length===0 && <option value="">ไม่มีบิลที่มียอดคงเหลือ</option>}
             {vendorIds.map((id)=>{const v=vendors.find((x)=>x.id===id);return <option key={id} value={id}>{v?.name||'-'}</option>})}
           </select>
         </label>
 
         <div className="wide voucher-bill-picker">
-          <div className="voucher-bill-head"><b>เลือกบิลตามใบวางบิล</b><span>{selectedExpenses.length} รายการ</span></div>
-          {vendorExpenses.length===0 && <div className="empty">ไม่มีบิลของผู้ขายรายนี้ที่รอจ่าย</div>}
-          {vendorExpenses.map((e)=><label key={e.id} className="voucher-bill-row">
-            <input type="checkbox" checked={selectedIds.includes(e.id)} onChange={()=>toggleExpense(e.id)} />
-            <span className="voucher-bill-main"><b>{e.document_no||e.expense_no}</b><small>{thaiDate(e.expense_date)} · {e.description}</small></span>
-            <span className="amount">{money(e.total_amount)}</span>
-            <span className="voucher-bill-wht">WHT {money(e.withholding_tax)}</span>
-          </label>)}
+          <div className="voucher-bill-head"><b>เลือกบิล / กำหนดยอดงวด</b><span>{allocations.length} รายการ</span></div>
+          {vendorExpenses.length===0 && <div className="empty">ไม่มีบิลของผู้ขายรายนี้ที่มียอดคงเหลือ</div>}
+          {vendorExpenses.map((e)=>{
+            const meta=expenseMeta[e.id];
+            const draft=drafts[e.id]||{};
+            return <div key={e.id} className="voucher-installment-row">
+              <label className="voucher-select">
+                <input type="checkbox" checked={!!draft.selected} onChange={()=>toggleExpense(e)} />
+                <span className="voucher-bill-main"><b>{e.document_no||e.expense_no}</b><small>{thaiDate(e.expense_date)} · {e.description}</small></span>
+              </label>
+              <div className="voucher-balance"><span>ยอดเต็ม</span><b>{money(e.total_amount)}</b><span>จ่ายสะสม</span><b>{money(meta.paidGross)}</b><span>คงเหลือ</span><b>{money(meta.remaining)}</b></div>
+              {draft.selected&&<div className="voucher-installment-inputs">
+                <label>จ่ายงวดนี้
+                  <input type="number" min="0.01" max={meta.remaining} step="0.01" value={draft.amount??''} onChange={(ev)=>updateDraft(e.id,'amount',ev.target.value)} required />
+                </label>
+                <label>WHT
+                  <select value={draft.whtRate??0} onChange={(ev)=>updateDraft(e.id,'whtRate',Number(ev.target.value))}>
+                    <option value="0">ไม่หัก</option><option value="1">1%</option><option value="3">3%</option><option value="5">5%</option>
+                  </select>
+                </label>
+              </div>}
+            </div>
+          })}
         </div>
 
         <label>วันที่ใบสำคัญจ่าย<input type="date" value={form.voucher_date} onChange={(e)=>set('voucher_date',e.target.value)} required /></label>
@@ -1523,14 +1593,14 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
         </>}
         <div className="calc wide">
-          <span>รวมบิล <b>{selectedExpenses.length} รายการ</b></span>
-          <span>ยอดเอกสาร <b>{money(gross)}</b></span>
+          <span>รวมงวด <b>{allocations.length} รายการ</b></span>
+          <span>ยอดงวดนี้ <b>{money(gross)}</b></span>
           <span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span>
           <span className="total-line">ยอดเช็ค / จ่ายสุทธิ <b>{money(net)}</b></span>
         </div>
-        <label className="wide">หมายเหตุ / เลขใบวางบิล<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} placeholder="เช่น ใบวางบิลเลขที่ ..." /></label>
+        <label className="wide">หมายเหตุ / เลขใบวางบิล<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} placeholder="เช่น งวดที่ 1 / ใบวางบิลเลขที่ ..." /></label>
         {error && <div className="error wide">{error}</div>}
-        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button disabled={!vendor || selectedExpenses.length===0}>ออกใบสำคัญจ่าย</button></div>
+        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button disabled={!vendor || allocations.length===0}>ออกใบสำคัญจ่าย</button></div>
       </form>
     </div>
   </div>;
