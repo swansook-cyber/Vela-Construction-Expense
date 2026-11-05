@@ -359,16 +359,50 @@ def list_payment_vouchers(project_id: int | None = None, db: Session = Depends(g
 
 @router.post("/payment-vouchers", response_model=PaymentVoucherOut, status_code=201)
 def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(get_db)):
-    requested_ids = list(dict.fromkeys(payload.expense_ids or ([] if payload.expense_id is None else [payload.expense_id])))
-    if not requested_ids:
-        raise HTTPException(status_code=400, detail="At least one expense is required")
+    # New flow: explicit per-expense allocations. Legacy callers still work by
+    # supplying expense_ids / expense_id and paying each selected expense in full.
+    if payload.allocations:
+        allocation_payloads = payload.allocations
+    else:
+        requested_ids = list(dict.fromkeys(payload.expense_ids or ([] if payload.expense_id is None else [payload.expense_id])))
+        if not requested_ids:
+            raise HTTPException(status_code=400, detail="At least one expense is required")
+        legacy_expenses = db.scalars(select(Expense).where(Expense.id.in_(requested_ids))).all()
+        legacy_map = {expense.id: expense for expense in legacy_expenses}
+        allocation_payloads = []
+        for expense_id in requested_ids:
+            expense = legacy_map.get(expense_id)
+            if not expense:
+                raise HTTPException(status_code=404, detail="One or more expenses were not found")
+            allocation_payloads.append(
+                {
+                    "expense_id": expense.id,
+                    "gross_amount": Decimal(expense.total_amount or 0),
+                    "withholding_tax": Decimal(expense.withholding_tax or 0),
+                }
+            )
 
-    expenses = db.scalars(select(Expense).where(Expense.id.in_(requested_ids))).all()
-    if len(expenses) != len(requested_ids):
+    normalized = []
+    seen_ids = set()
+    for allocation in allocation_payloads:
+        expense_id = allocation.expense_id if hasattr(allocation, "expense_id") else allocation["expense_id"]
+        gross = Decimal(allocation.gross_amount if hasattr(allocation, "gross_amount") else allocation["gross_amount"])
+        wht = Decimal(allocation.withholding_tax if hasattr(allocation, "withholding_tax") else allocation["withholding_tax"])
+        if expense_id in seen_ids:
+            raise HTTPException(status_code=400, detail="Duplicate expense allocation")
+        seen_ids.add(expense_id)
+        if gross <= 0:
+            raise HTTPException(status_code=400, detail="Payment installment amount must be greater than zero")
+        if wht < 0 or wht > gross:
+            raise HTTPException(status_code=400, detail="Invalid withholding tax amount")
+        normalized.append((expense_id, gross, wht))
+
+    expense_ids = [row[0] for row in normalized]
+    expenses = db.scalars(select(Expense).where(Expense.id.in_(expense_ids))).all()
+    if len(expenses) != len(expense_ids):
         raise HTTPException(status_code=404, detail="One or more expenses were not found")
-
     expense_map = {expense.id: expense for expense in expenses}
-    expenses = [expense_map[expense_id] for expense_id in requested_ids]
+    expenses = [expense_map[expense_id] for expense_id in expense_ids]
 
     if any(expense.payment_status == "VOID" for expense in expenses):
         raise HTTPException(status_code=409, detail="Voided expense cannot be paid")
@@ -384,27 +418,37 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
     if payload.vendor_id is not None and not db.get(Vendor, payload.vendor_id):
         raise HTTPException(status_code=400, detail="Invalid vendor")
 
-    already_linked = db.scalars(
-        select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id.in_(requested_ids))
-    ).all()
-    if already_linked:
-        raise HTTPException(status_code=409, detail="One or more expenses already have a payment voucher")
+    allocation_rows = []
+    for expense_id, gross, wht in normalized:
+        expense = expense_map[expense_id]
+        previous_items = db.scalars(
+            select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense_id)
+        ).all()
+        already_allocated = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0"))
+        remaining = max(Decimal(expense.total_amount or 0) - already_allocated, Decimal("0"))
+        if gross > remaining + Decimal("0.01"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payment amount exceeds remaining balance for {expense.expense_no}",
+            )
+        net = max(gross - wht, Decimal("0"))
+        allocation_rows.append((expense, gross, wht, net, already_allocated))
 
-    gross_amount = sum((Decimal(expense.total_amount or 0) for expense in expenses), Decimal("0"))
-    withholding_tax = sum((Decimal(expense.withholding_tax or 0) for expense in expenses), Decimal("0"))
-    net_amount = max(gross_amount - withholding_tax, Decimal("0"))
+    gross_amount = sum((row[1] for row in allocation_rows), Decimal("0"))
+    withholding_tax = sum((row[2] for row in allocation_rows), Decimal("0"))
+    net_amount = sum((row[3] for row in allocation_rows), Decimal("0"))
 
     if abs(Decimal(payload.gross_amount) - gross_amount) > Decimal("0.01"):
-        raise HTTPException(status_code=400, detail="Gross amount must equal selected expense total")
+        raise HTTPException(status_code=400, detail="Gross amount must equal allocation total")
     if abs(Decimal(payload.withholding_tax) - withholding_tax) > Decimal("0.01"):
-        raise HTTPException(status_code=400, detail="Withholding tax must equal selected expense withholding tax")
+        raise HTTPException(status_code=400, detail="Withholding tax must equal allocation total")
     if abs(Decimal(payload.net_amount) - net_amount) > Decimal("0.01"):
-        raise HTTPException(status_code=400, detail="Net amount must equal gross amount minus withholding tax")
+        raise HTTPException(status_code=400, detail="Net amount must equal allocation net total")
     if payload.payment_method == "CHEQUE" and (not payload.bank_name or not payload.cheque_no or not payload.cheque_date):
         raise HTTPException(status_code=400, detail="Cheque payment requires bank name, cheque number and cheque date")
 
-    voucher_data = payload.model_dump(exclude={"expense_ids"})
-    voucher_data["expense_id"] = requested_ids[0]  # legacy compatibility / primary reference
+    voucher_data = payload.model_dump(exclude={"expense_ids", "allocations"})
+    voucher_data["expense_id"] = expense_ids[0]  # legacy primary reference
     voucher = PaymentVoucher(
         voucher_no=next_voucher_no(db, payload.voucher_date),
         wht_certificate_no=next_wht_no(db, payload.voucher_date) if withholding_tax > 0 else None,
@@ -413,11 +457,28 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
     db.add(voucher)
     db.flush()
 
-    for expense in expenses:
-        db.add(PaymentVoucherItem(voucher_id=voucher.id, expense_id=expense.id))
+    for expense, gross, wht, net, already_allocated in allocation_rows:
+        db.add(
+            PaymentVoucherItem(
+                voucher_id=voucher.id,
+                expense_id=expense.id,
+                gross_amount=gross,
+                withholding_tax=wht,
+                net_amount=net,
+            )
+        )
+
+        previous_items = db.scalars(
+            select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense.id)
+        ).all()
+        cumulative_gross = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0")) + gross
+        cumulative_wht = sum((Decimal(item.withholding_tax or 0) for item in previous_items), Decimal("0")) + wht
+        cumulative_net = sum((Decimal(item.net_amount or 0) for item in previous_items), Decimal("0")) + net
+
+        expense.withholding_tax = cumulative_wht
+        expense.net_paid = cumulative_net
         expense.payment_method = payload.payment_method
-        expense.net_paid = max(Decimal(expense.total_amount or 0) - Decimal(expense.withholding_tax or 0), Decimal("0"))
-        expense.payment_status = "PAID"
+        expense.payment_status = "PAID" if cumulative_gross >= Decimal(expense.total_amount or 0) - Decimal("0.01") else "PARTIAL"
         expense.updated_at = datetime.utcnow()
 
     add_audit(
@@ -427,7 +488,15 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         "CREATE",
         {
             "voucher_no": voucher.voucher_no,
-            "expense_ids": requested_ids,
+            "allocations": [
+                {
+                    "expense_id": expense.id,
+                    "gross_amount": str(gross),
+                    "withholding_tax": str(wht),
+                    "net_amount": str(net),
+                }
+                for expense, gross, wht, net, _ in allocation_rows
+            ],
             "gross_amount": str(gross_amount),
             "withholding_tax": str(withholding_tax),
             "net_amount": str(net_amount),
