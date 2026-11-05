@@ -62,6 +62,7 @@ class ExpenseCreate(BaseModel):
     subtotal: Decimal = Decimal("0")
     vat_amount: Decimal = Decimal("0")
     withholding_tax: Decimal = Decimal("0")
+    default_wht_rate: Decimal | None = None
     total_amount: Decimal = Decimal("0")
     net_paid: Decimal = Decimal("0")
     payment_status: str = "UNPAID"
