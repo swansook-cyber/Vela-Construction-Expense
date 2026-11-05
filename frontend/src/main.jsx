@@ -914,7 +914,14 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
 
   const costMap = useMemo(() => Object.fromEntries(costCodes.map((c) => [c.id, c])), [costCodes]);
   const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v])), [vendors]);
-  const voucherByExpense = useMemo(() => Object.fromEntries(vouchers.map((v) => [v.expense_id, v])), [vouchers]);
+  const voucherByExpense = useMemo(() => {
+    const pairs = [];
+    vouchers.forEach((v) => {
+      const ids = v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []);
+      ids.forEach((id) => pairs.push([id, v]));
+    });
+    return Object.fromEntries(pairs);
+  }, [vouchers]);
 
   const filtered = useMemo(() => expenses.filter((e) => {
     if (e.payment_status === 'VOID') return false;
@@ -981,12 +988,16 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     if (reportType === 'WHT53' && vendor?.entity_type !== 'JURISTIC') return false;
     return reportType === 'WHT3' || reportType === 'WHT53';
   }).map((v) => {
-    const e = expenses.find((x) => x.id === v.expense_id);
+    const ids = v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []);
+    const voucherExpenses = ids.map((id) => expenses.find((x) => x.id === id)).filter(Boolean);
+    const e = voucherExpenses[0];
     const vendor = vendorMap[v.vendor_id];
-    const base = Number(e?.subtotal || v.gross_amount || 0);
+    const base = voucherExpenses.length
+      ? voucherExpenses.reduce((sum,x)=>sum + Number(x.subtotal || 0),0)
+      : Number(v.gross_amount || 0);
     const tax = Number(v.withholding_tax || 0);
     const rate = v.wht_rate != null ? Number(v.wht_rate) : (base ? tax / base * 100 : 0);
-    return { voucher:v, expense:e, vendor, base, tax, rate };
+    return { voucher:v, expense:e, expenses:voucherExpenses, vendor, base, tax, rate };
   }), [vouchers, expenses, vendorMap, month, reportType]);
 
   const vatRows = useMemo(() => expenses.filter((e) => {
@@ -1024,12 +1035,12 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
         String(r.voucher.wht_certificate_no || '').trim(),
         String(r.vendor?.name || r.voucher.payee_name || '').trim(),
         String(r.vendor?.tax_id || '').trim(),
-        String(r.voucher.income_type || r.expense?.description || '').trim(),
+        String(r.voucher.income_type || r.expenses?.map((e)=>e.description).join(' / ') || r.expense?.description || '').trim(),
         r.base,
         r.rate,
         r.tax,
         String(r.voucher.voucher_no || '').trim(),
-        String(r.expense?.document_no || '').trim()
+        String(r.expenses?.map((e)=>e.document_no || e.expense_no).filter(Boolean).join(', ') || r.expense?.document_no || '').trim()
       ]);
       sheetName = reportType === 'WHT3' ? 'PND3 Summary' : 'PND53 Summary';
     } else if (reportType === 'VAT') {
@@ -1790,11 +1801,15 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
   }
 
   function printWht(v) {
-    const e=expenseMap[v.expense_id];
+    const voucherExpenseIds = v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []);
+    const voucherExpenses = voucherExpenseIds.map((id)=>expenseMap[id]).filter(Boolean);
+    const e=voucherExpenses[0];
     const vendor=vendors.find((x)=>x.id===v.vendor_id);
-    const base=Number(e?.subtotal||v.gross_amount||0);
+    const base=voucherExpenses.length
+      ? voucherExpenses.reduce((sum,item)=>sum + Number(item.subtotal||0),0)
+      : Number(v.gross_amount||0);
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
-    const incomeLabel=v.income_type||e?.description||'อื่น ๆ';
+    const incomeLabel=v.income_type||voucherExpenses.map((item)=>item.description).join(' / ')||e?.description||'อื่น ๆ';
     const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง|ก่อสร้าง|ซ่อม|ทาสี|มุงหลังคา|ติดตั้ง|ปรับปรุง/i.test(incomeLabel);
     const rowAmount=(active)=>active ? money(base) : '';
     const rowTax=(active)=>active ? money(v.withholding_tax) : '';
