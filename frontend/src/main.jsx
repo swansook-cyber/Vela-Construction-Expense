@@ -1277,9 +1277,20 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 function ChequePreviewModal({ voucher, onClose }) {
   const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42 };
   const [cfg,setCfg]=useState(() => {
-    try { return {...defaults,...JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}')}; }
+    try {
+      const saved=JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}');
+      if (saved.width===190 && saved.height===82) {
+        const migrated={...saved,width:178,height:89};
+        if (saved.dateX===146) migrated.dateX=134;
+        if (saved.amountX===146) migrated.amountX=134;
+        localStorage.setItem('vela-cheque-layout',JSON.stringify(migrated));
+        return {...defaults,...migrated};
+      }
+      return {...defaults,...saved};
+    }
     catch { return defaults; }
   });
+  const [showSettings,setShowSettings]=useState(false);
   const set=(k,v)=>setCfg((x)=>({...x,[k]:Number(v)}));
   const date=thaiDate(voucher.cheque_date||voucher.voucher_date);
 
@@ -1322,21 +1333,31 @@ function ChequePreviewModal({ voucher, onClose }) {
         </div>
       </div>
 
-      <div className="form-grid">
-        <label>ความกว้างเช็ค (mm)<input type="number" step="0.5" value={cfg.width} onChange={(e)=>set('width',e.target.value)} /></label>
-        <label>ความสูงเช็ค (mm)<input type="number" step="0.5" value={cfg.height} onChange={(e)=>set('height',e.target.value)} /></label>
-        <label>ชื่อผู้รับ X (mm)<input type="number" step="0.5" value={cfg.payeeX} onChange={(e)=>set('payeeX',e.target.value)} /></label>
-        <label>ชื่อผู้รับ Y (mm)<input type="number" step="0.5" value={cfg.payeeY} onChange={(e)=>set('payeeY',e.target.value)} /></label>
-        <label>วันที่ X (mm)<input type="number" step="0.5" value={cfg.dateX} onChange={(e)=>set('dateX',e.target.value)} /></label>
-        <label>วันที่ Y (mm)<input type="number" step="0.5" value={cfg.dateY} onChange={(e)=>set('dateY',e.target.value)} /></label>
-        <label>จำนวนเงิน X (mm)<input type="number" step="0.5" value={cfg.amountX} onChange={(e)=>set('amountX',e.target.value)} /></label>
-        <label>จำนวนเงิน Y (mm)<input type="number" step="0.5" value={cfg.amountY} onChange={(e)=>set('amountY',e.target.value)} /></label>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
+        <button className="mini ghost" onClick={()=>setShowSettings((x)=>!x)}>
+          {showSettings?'ซ่อนการตั้งค่า':'⚙ ตั้งค่าตำแหน่ง'}
+        </button>
       </div>
+
+      {showSettings&&<>
+        <div className="form-grid">
+          <label>ความกว้างเช็ค (mm)<input type="number" step="0.5" value={cfg.width} onChange={(e)=>set('width',e.target.value)} /></label>
+          <label>ความสูงเช็ค (mm)<input type="number" step="0.5" value={cfg.height} onChange={(e)=>set('height',e.target.value)} /></label>
+          <label>ชื่อผู้รับ X (mm)<input type="number" step="0.5" value={cfg.payeeX} onChange={(e)=>set('payeeX',e.target.value)} /></label>
+          <label>ชื่อผู้รับ Y (mm)<input type="number" step="0.5" value={cfg.payeeY} onChange={(e)=>set('payeeY',e.target.value)} /></label>
+          <label>วันที่ X (mm)<input type="number" step="0.5" value={cfg.dateX} onChange={(e)=>set('dateX',e.target.value)} /></label>
+          <label>วันที่ Y (mm)<input type="number" step="0.5" value={cfg.dateY} onChange={(e)=>set('dateY',e.target.value)} /></label>
+          <label>จำนวนเงิน X (mm)<input type="number" step="0.5" value={cfg.amountX} onChange={(e)=>set('amountX',e.target.value)} /></label>
+          <label>จำนวนเงิน Y (mm)<input type="number" step="0.5" value={cfg.amountY} onChange={(e)=>set('amountY',e.target.value)} /></label>
+        </div>
+        <div className="actions" style={{marginTop:'10px',marginBottom:'10px'}}>
+          <button className="ghost" onClick={()=>{setCfg(defaults);localStorage.removeItem('vela-cheque-layout')}}>คืนค่าเริ่มต้น</button>
+          <button className="ghost" onClick={save}>บันทึกตำแหน่ง</button>
+        </div>
+      </>}
 
       <div className="info-message">แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
       <div className="actions" style={{marginTop:'14px'}}>
-        <button className="ghost" onClick={()=>{setCfg(defaults);localStorage.removeItem('vela-cheque-layout')}}>คืนค่าเริ่มต้น</button>
-        <button className="ghost" onClick={save}>บันทึกตำแหน่ง</button>
         <button onClick={openPrint}>เปิด Preview พิมพ์</button>
       </div>
     </div>
