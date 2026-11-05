@@ -69,6 +69,7 @@ class Expense(Base):
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     vat_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    default_wht_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     net_paid: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     payment_status: Mapped[str] = mapped_column(String(30), default="UNPAID")
