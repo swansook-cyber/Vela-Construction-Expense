@@ -129,10 +129,17 @@ class AuditLogOut(BaseModel):
     created_at: datetime
 
 
+class PaymentVoucherAllocation(BaseModel):
+    expense_id: int
+    gross_amount: Decimal
+    withholding_tax: Decimal = Decimal("0")
+
+
 class PaymentVoucherCreate(BaseModel):
     project_id: int
     expense_id: int | None = None
     expense_ids: list[int] = Field(default_factory=list)
+    allocations: list[PaymentVoucherAllocation] = Field(default_factory=list)
     vendor_id: int | None = None
     voucher_date: date
     gross_amount: Decimal
