@@ -1273,11 +1273,82 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
   </div>;
 }
 
+
+function ChequePreviewModal({ voucher, onClose }) {
+  const defaults = { width:190, height:82, payeeX:18, payeeY:30, dateX:146, dateY:12, amountX:146, amountY:42 };
+  const [cfg,setCfg]=useState(() => {
+    try { return {...defaults,...JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}')}; }
+    catch { return defaults; }
+  });
+  const set=(k,v)=>setCfg((x)=>({...x,[k]:Number(v)}));
+  const date=thaiDate(voucher.cheque_date||voucher.voucher_date);
+
+  function save(){
+    localStorage.setItem('vela-cheque-layout',JSON.stringify(cfg));
+  }
+
+  function openPrint(){
+    save();
+    const title=voucher.cheque_no||voucher.voucher_no;
+    printDocument(title,`<style>
+      @page{size:${cfg.width}mm ${cfg.height}mm;margin:0}
+      body{margin:0;background:#fff}
+      .cheque-print{position:relative;width:${cfg.width}mm;height:${cfg.height}mm;font-family:Arial,"Noto Sans Thai",sans-serif;color:#000}
+      .c-payee,.c-date,.c-amount{position:absolute;white-space:nowrap}
+      .c-payee{left:${cfg.payeeX}mm;top:${cfg.payeeY}mm;font-size:16px;font-weight:700}
+      .c-date{left:${cfg.dateX}mm;top:${cfg.dateY}mm;font-size:13px}
+      .c-amount{left:${cfg.amountX}mm;top:${cfg.amountY}mm;font-size:16px;font-weight:700}
+      @media print{.preview-toolbar{display:none!important}.preview-sheet{margin:0!important;box-shadow:none!important;width:auto!important;min-height:0!important}}
+    </style>
+    <div class="cheque-print">
+      <div class="c-payee">${voucher.payee_name}</div>
+      <div class="c-date">${date}</div>
+      <div class="c-amount">${money(voucher.net_amount)}</div>
+    </div>`);
+  }
+
+  return <div className="modal-backdrop" onMouseDown={onClose}>
+    <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="modal-head">
+        <div><p className="eyebrow">Cheque Calibration</p><h2>ตัวอย่างพิมพ์เช็ค</h2><p>{voucher.bank_name||'-'} · {voucher.cheque_no||'-'}</p></div>
+        <button className="ghost icon" onClick={onClose}>×</button>
+      </div>
+
+      <div style={{overflow:'auto',padding:'12px',background:'#eef1f3',borderRadius:'14px',marginBottom:'16px'}}>
+        <div style={{position:'relative',width:`${cfg.width}mm`,height:`${cfg.height}mm`,background:'#fff',border:'1px dashed #999',margin:'0 auto'}}>
+          <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{voucher.payee_name}</div>
+          <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>
+          <div style={{position:'absolute',left:`${cfg.amountX}mm`,top:`${cfg.amountY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{money(voucher.net_amount)}</div>
+        </div>
+      </div>
+
+      <div className="form-grid">
+        <label>ความกว้างเช็ค (mm)<input type="number" step="0.5" value={cfg.width} onChange={(e)=>set('width',e.target.value)} /></label>
+        <label>ความสูงเช็ค (mm)<input type="number" step="0.5" value={cfg.height} onChange={(e)=>set('height',e.target.value)} /></label>
+        <label>ชื่อผู้รับ X (mm)<input type="number" step="0.5" value={cfg.payeeX} onChange={(e)=>set('payeeX',e.target.value)} /></label>
+        <label>ชื่อผู้รับ Y (mm)<input type="number" step="0.5" value={cfg.payeeY} onChange={(e)=>set('payeeY',e.target.value)} /></label>
+        <label>วันที่ X (mm)<input type="number" step="0.5" value={cfg.dateX} onChange={(e)=>set('dateX',e.target.value)} /></label>
+        <label>วันที่ Y (mm)<input type="number" step="0.5" value={cfg.dateY} onChange={(e)=>set('dateY',e.target.value)} /></label>
+        <label>จำนวนเงิน X (mm)<input type="number" step="0.5" value={cfg.amountX} onChange={(e)=>set('amountX',e.target.value)} /></label>
+        <label>จำนวนเงิน Y (mm)<input type="number" step="0.5" value={cfg.amountY} onChange={(e)=>set('amountY',e.target.value)} /></label>
+      </div>
+
+      <div className="info-message">แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
+      <div className="actions" style={{marginTop:'14px'}}>
+        <button className="ghost" onClick={()=>{setCfg(defaults);localStorage.removeItem('vela-cheque-layout')}}>คืนค่าเริ่มต้น</button>
+        <button className="ghost" onClick={save}>บันทึกตำแหน่ง</button>
+        <button onClick={openPrint}>เปิด Preview พิมพ์</button>
+      </div>
+    </div>
+  </div>;
+}
+
 function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) {
   const [vouchers,setVouchers]=useState([]);
   const [company,setCompany]=useState(null);
   const [showCreate,setShowCreate]=useState(false);
   const [editingPayment,setEditingPayment]=useState(null);
+  const [previewCheque,setPreviewCheque]=useState(null);
   const expenseMap=useMemo(()=>Object.fromEntries(expenses.map((e)=>[e.id,e])),[expenses]);
 
   async function load() {
@@ -1524,10 +1595,11 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <tbody>{rows.length===0&&<tr><td colSpan="8" className="empty">ยังไม่มีรายการ</td></tr>}
       {rows.map((v)=><tr key={v.id}><td className="mono">{mode==='wht'?(v.wht_certificate_no||'-'):mode==='cheque'?(v.cheque_no||'-'):v.voucher_no}</td>
         <td>{thaiDate(v.voucher_date)}</td><td>{v.payee_name}</td><td className="amount">{money(v.gross_amount)}</td><td className="amount">{money(v.withholding_tax)}</td><td className="amount">{money(v.net_amount)}</td><td>{v.payment_method||'-'}</td>
-        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?printCheque(v):printVoucher(v)}>พิมพ์</button>{mode==='voucher'&&<button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button>}</div></td></tr>)}</tbody>
+        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?setPreviewCheque(v):printVoucher(v)}>{mode==='cheque'?'Preview':'พิมพ์'}</button>{mode==='voucher'&&<button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button>}</div></td></tr>)}</tbody>
     </table></div>
     {showCreate&&<PaymentVoucherModal project={project} expenses={expenses} vendors={vendors} vouchers={vouchers} onClose={()=>setShowCreate(false)} onSaved={async()=>{setShowCreate(false);await load();await onUpdated();}} />}
     {editingPayment&&<PaymentEditModal voucher={editingPayment} onClose={()=>setEditingPayment(null)} onSaved={async()=>{setEditingPayment(null);await load();await onUpdated();}} />}
+    {previewCheque&&<ChequePreviewModal voucher={previewCheque} onClose={()=>setPreviewCheque(null)} />}
   </section>;
 }
 
