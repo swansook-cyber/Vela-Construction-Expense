@@ -570,3 +570,45 @@ body{
     color:#444;
   }
 }
+
+
+.voucher-bill-picker{
+  border:1px solid var(--line);
+  border-radius:10px;
+  overflow:hidden;
+  background:#fff;
+}
+.voucher-bill-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  background:#f7f9fa;
+  border-bottom:1px solid var(--line);
+  font-size:12px;
+}
+.voucher-bill-row{
+  display:grid !important;
+  grid-template-columns:auto minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  margin:0 !important;
+  border-bottom:1px solid #edf1f3;
+  cursor:pointer;
+}
+.voucher-bill-row:last-child{border-bottom:0}
+.voucher-bill-row:hover{background:#fafcfd}
+.voucher-bill-row input{width:18px;height:18px;margin:0}
+.voucher-bill-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.voucher-bill-main b,.voucher-bill-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voucher-bill-main small{color:var(--muted);font-size:11px}
+.voucher-bill-wht{font-size:11px;color:var(--muted);white-space:nowrap}
+@media(max-width:760px){
+  .voucher-bill-row{
+    grid-template-columns:auto minmax(0,1fr) auto;
+  }
+  .voucher-bill-wht{
+    grid-column:2/-1;
+  }
+}
