@@ -1911,12 +1911,11 @@ function App() {
       <nav className="tabs app-nav" aria-label="เมนูหลัก">
         <button className={active === 'expenses' ? 'active' : ''} onClick={() => setActive('expenses')}>ค่าใช้จ่าย</button>
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
-        <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
         <button className={active === 'wht' ? 'active' : ''} onClick={() => setActive('wht')}>หัก ณ ที่จ่าย</button>
         <button className={active === 'voucher' ? 'active' : ''} onClick={() => setActive('voucher')}>ใบสำคัญจ่าย</button>
         <button className={active === 'cheque' ? 'active' : ''} onClick={() => setActive('cheque')}>พิมพ์เช็ค</button>
         <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
-        <div className="nav-more"><button className={active === 'settings' || active === 'audit' ? 'active' : ''} aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>เพิ่มเติม ▾</button>{moreOpen && <div className="nav-more-menu"><button onClick={() => { setActive('settings'); setMoreOpen(false); }}>ตั้งค่าบริษัท</button><button onClick={() => { setActive('audit'); setMoreOpen(false); }}>Audit Log</button></div>}</div>
+        <div className="nav-more"><button className={active === 'codes' || active === 'settings' || active === 'audit' ? 'active' : ''} aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>เพิ่มเติม ▾</button>{moreOpen && <div className="nav-more-menu"><button onClick={() => { setActive('codes'); setMoreOpen(false); }}>Cost Codes</button><button onClick={() => { setActive('settings'); setMoreOpen(false); }}>ตั้งค่าบริษัท</button><button onClick={() => { setActive('audit'); setMoreOpen(false); }}>Audit Log</button></div>}</div>
       </nav>
 
       {active === 'expenses' && (
