@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models.entities import AuditLog, CostCode, Expense, Project, Vendor
+from app.models.entities import AuditLog, CostCode, Expense, PaymentVoucher, Project, Vendor
 from app.services.paperless import PaperlessClient
 from app.services.ocr_review import analyze_ocr_document
 from app.schemas.entities import (
@@ -23,6 +23,8 @@ from app.schemas.entities import (
     ExpenseOut,
     ExpenseUpdate,
     ExpenseVoid,
+    PaymentVoucherCreate,
+    PaymentVoucherOut,
     ProjectOut,
     VendorCreate,
     VendorOut,
@@ -86,6 +88,20 @@ def next_expense_no(db: Session, expense_date: date) -> str:
     year = expense_date.year
     prefix = f"EXP-{year}-"
     count = db.scalar(select(func.count(Expense.id)).where(Expense.expense_no.like(f"{prefix}%"))) or 0
+    return f"{prefix}{count + 1:05d}"
+
+
+def next_voucher_no(db: Session, voucher_date: date) -> str:
+    year = voucher_date.year
+    prefix = f"PV-{year}-"
+    count = db.scalar(select(func.count(PaymentVoucher.id)).where(PaymentVoucher.voucher_no.like(f"{prefix}%"))) or 0
+    return f"{prefix}{count + 1:05d}"
+
+
+def next_wht_no(db: Session, voucher_date: date) -> str:
+    year = voucher_date.year
+    prefix = f"WHT-{year}-"
+    count = db.scalar(select(func.count(PaymentVoucher.id)).where(PaymentVoucher.wht_certificate_no.like(f"{prefix}%"))) or 0
     return f"{prefix}{count + 1:05d}"
 
 
@@ -301,6 +317,69 @@ def link_document(expense_id: int, payload: DocumentLink, db: Session = Depends(
     db.commit()
     db.refresh(expense)
     return expense
+
+
+@router.get("/payment-vouchers", response_model=list[PaymentVoucherOut])
+def list_payment_vouchers(project_id: int | None = None, db: Session = Depends(get_db)):
+    stmt = select(PaymentVoucher)
+    if project_id is not None:
+        stmt = stmt.where(PaymentVoucher.project_id == project_id)
+    stmt = stmt.order_by(PaymentVoucher.voucher_date.desc(), PaymentVoucher.id.desc())
+    return db.scalars(stmt).all()
+
+
+@router.post("/payment-vouchers", response_model=PaymentVoucherOut, status_code=201)
+def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(get_db)):
+    expense = db.get(Expense, payload.expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    if expense.payment_status == "VOID":
+        raise HTTPException(status_code=409, detail="Voided expense cannot be paid")
+    if expense.project_id != payload.project_id:
+        raise HTTPException(status_code=400, detail="Expense project mismatch")
+    if payload.vendor_id is not None and not db.get(Vendor, payload.vendor_id):
+        raise HTTPException(status_code=400, detail="Invalid vendor")
+    if db.scalar(select(PaymentVoucher).where(PaymentVoucher.expense_id == payload.expense_id)):
+        raise HTTPException(status_code=409, detail="Expense already has a payment voucher")
+    if payload.gross_amount < 0 or payload.withholding_tax < 0 or payload.net_amount < 0:
+        raise HTTPException(status_code=400, detail="Amounts cannot be negative")
+
+    expected_net = max(payload.gross_amount - payload.withholding_tax, Decimal("0"))
+    if abs(payload.net_amount - expected_net) > Decimal("0.01"):
+        raise HTTPException(status_code=400, detail="Net amount must equal gross amount minus withholding tax")
+
+    voucher = PaymentVoucher(
+        voucher_no=next_voucher_no(db, payload.voucher_date),
+        wht_certificate_no=next_wht_no(db, payload.voucher_date) if payload.withholding_tax > 0 else None,
+        **payload.model_dump(),
+    )
+    db.add(voucher)
+    db.flush()
+
+    expense.withholding_tax = payload.withholding_tax
+    expense.payment_method = payload.payment_method
+    expense.net_paid = payload.net_amount
+    expense.payment_status = "PAID"
+    expense.updated_at = datetime.utcnow()
+
+    add_audit(
+        db,
+        "payment_voucher",
+        voucher.id,
+        "CREATE",
+        {
+            "voucher_no": voucher.voucher_no,
+            "expense_id": voucher.expense_id,
+            "gross_amount": str(voucher.gross_amount),
+            "withholding_tax": str(voucher.withholding_tax),
+            "net_amount": str(voucher.net_amount),
+            "wht_certificate_no": voucher.wht_certificate_no,
+            "cheque_no": voucher.cheque_no,
+        },
+    )
+    db.commit()
+    db.refresh(voucher)
+    return voucher
 
 
 @router.get("/dashboard/{project_id}", response_model=DashboardSummary)
