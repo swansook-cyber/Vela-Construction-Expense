@@ -1235,22 +1235,29 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
     const copy=(label)=>`<section style="min-height:260mm;page-break-after:always">
       <div class="head"><h2>หนังสือรับรองการหักภาษี ณ ที่จ่าย</h2><h3>ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</h3><p>${label} · เลขที่ ${v.wht_certificate_no||''}</p></div>
-      <div class="meta">
-        <div class="line"><span>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย</span><b>${company?.legal_name||'Sea Mountain'}</b></div>
-        <div class="line"><span>เลขประจำตัวผู้เสียภาษี</span><b>${company?.tax_id||'-'}</b></div>
-        <div class="line" style="grid-column:1/-1"><span>ที่อยู่ผู้จ่าย</span><b>${company?.address||'-'}</b></div>
-        <div class="line"><span>สาขา</span><b>${company?.branch||'-'}</b></div>
-        <div class="line"><span>โทรศัพท์</span><b>${company?.phone||'-'}</b></div>
-        <div class="line"><span>ผู้ถูกหักภาษี ณ ที่จ่าย</span><b>${v.payee_name}</b></div>
-        <div class="line"><span>เลขประจำตัวผู้เสียภาษี/บัตรประชาชน</span><b>${vendor?.tax_id||'-'}</b></div>
-        <div class="line" style="grid-column:1/-1"><span>ที่อยู่ผู้ถูกหัก</span><b>${vendor?.address||'-'}</b></div>
-        <div class="line"><span>ประเภทเงินได้</span><b>${v.income_type||e?.description||'-'}</b></div>
-        <div class="line"><span>วันที่จ่าย</span><b>${thaiDate(v.voucher_date)}</b></div>
-        <div class="line"><span>จำนวนเงินที่จ่าย</span><b>${money(base)}</b></div>
-        <div class="line"><span>อัตราภาษี</span><b>${rate.toFixed(2)}%</b></div>
-        <div class="line"><span>ภาษีที่หักและนำส่งไว้</span><b>${money(v.withholding_tax)}</b></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+        <div class="line"><span style="min-width:190px">ผู้มีหน้าที่หักภาษี ณ ที่จ่าย</span><b style="white-space:nowrap">${company?.legal_name||'Sea Mountain'}</b></div>
+        <div class="line"><span style="min-width:170px">เลขประจำตัวผู้เสียภาษี</span><b style="white-space:nowrap">${company?.tax_id||'-'}</b></div>
+
+        <div class="line" style="grid-column:1/-1"><span style="min-width:120px">ที่อยู่ผู้จ่าย</span><b>${company?.address||'-'}</b></div>
+
+        <div class="line"><span style="min-width:80px">สาขา</span><b style="white-space:nowrap">${company?.branch||'-'}</b></div>
+        <div class="line"><span style="min-width:90px">โทรศัพท์</span><b style="white-space:nowrap">${company?.phone||'-'}</b></div>
+
+        <div class="line"><span style="min-width:180px">ผู้ถูกหักภาษี ณ ที่จ่าย</span><b style="white-space:nowrap">${v.payee_name}</b></div>
+        <div class="line"><span style="min-width:210px">เลขประจำตัวผู้เสียภาษี/บัตรประชาชน</span><b style="white-space:nowrap">${vendor?.tax_id||'-'}</b></div>
+
+        <div class="line" style="grid-column:1/-1"><span style="min-width:120px">ที่อยู่ผู้ถูกหัก</span><b>${vendor?.address||'-'}</b></div>
+
+        <div class="line"><span style="min-width:110px">ประเภทเงินได้</span><b>${v.income_type||e?.description||'-'}</b></div>
+        <div class="line"><span style="min-width:90px">วันที่จ่าย</span><b style="white-space:nowrap">${thaiDate(v.voucher_date)}</b></div>
+
+        <div class="line"><span style="min-width:140px">จำนวนเงินที่จ่าย</span><b style="white-space:nowrap">${money(base)}</b></div>
+        <div class="line"><span style="min-width:100px">อัตราภาษี</span><b style="white-space:nowrap">${rate.toFixed(2)}%</b></div>
+
+        <div class="line" style="grid-column:1/-1"><span style="min-width:180px">ภาษีที่หักและนำส่งไว้</span><b style="white-space:nowrap">${money(v.withholding_tax)}</b></div>
       </div>
-      <p class="note">ผู้จ่ายเงินรับรองว่าข้อความและตัวเลขข้างต้นถูกต้องตรงกับความเป็นจริง</p>
+      <p class="note" style="white-space:normal">ผู้จ่ายเงินรับรองว่าข้อความและตัวเลขข้างต้นถูกต้องตรงกับความเป็นจริง</p>
       <div class="sign"><div>ผู้จัดทำ</div><div>ผู้มีอำนาจลงนาม</div><div>วันที่ออกหนังสือ</div></div>
     </section>`;
     printDocument(v.wht_certificate_no||'50 ทวิ', copy('ฉบับที่ 1 สำหรับผู้ถูกหักภาษี ณ ที่จ่าย') + copy('ฉบับที่ 2 สำหรับผู้ถูกหักภาษี ณ ที่จ่าย'));
