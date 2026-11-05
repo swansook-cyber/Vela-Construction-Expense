@@ -1010,8 +1010,15 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     const voucherExpenses = ids.map((id) => expenses.find((x) => x.id === id)).filter(Boolean);
     const e = voucherExpenses[0];
     const vendor = vendorMap[v.vendor_id];
+    const allocationByExpense = Object.fromEntries((v.allocations||[]).map((a)=>[a.expense_id,a]));
     const base = voucherExpenses.length
-      ? voucherExpenses.reduce((sum,x)=>sum + Number(x.subtotal || 0),0)
+      ? voucherExpenses.reduce((sum,x)=>{
+          const allocation=allocationByExpense[x.id];
+          const gross=Number(allocation?.gross_amount ?? x.total_amount ?? 0);
+          const total=Number(x.total_amount||0);
+          const subtotal=Number(x.subtotal||0);
+          return sum + (total ? gross*subtotal/total : gross);
+        },0)
       : Number(v.gross_amount || 0);
     const tax = Number(v.withholding_tax || 0);
     const rate = v.wht_rate != null ? Number(v.wht_rate) : (base ? tax / base * 100 : 0);
@@ -1807,6 +1814,10 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const voucherExpenseIds = v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []);
     const voucherExpenses = voucherExpenseIds.map((id)=>expenseMap[id]).filter(Boolean);
     const e=voucherExpenses[0];
+    const voucherAllocations = v.allocations?.length
+      ? v.allocations
+      : voucherExpenses.map((item)=>({expense_id:item.id,gross_amount:item.total_amount,withholding_tax:item.withholding_tax,net_amount:Math.max(Number(item.total_amount||0)-Number(item.withholding_tax||0),0)}));
+    const allocationMap = Object.fromEntries(voucherAllocations.map((a)=>[a.expense_id,a]));
     const vendor=vendors.find((x)=>x.id===v.vendor_id);
     const method=({TRANSFER:'โอนเงิน',CASH:'เงินสด',CHEQUE:'เช็ค',CREDIT:'เครดิต / เจ้าหนี้'})[v.payment_method]||v.payment_method||'-';
     printDocument(v.voucher_no,`<style>
@@ -1855,15 +1866,15 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       </div>
 
       <table class="items">
-        <thead><tr><th style="width:8%">วันที่</th><th style="width:14%">เลขเอกสาร</th><th>รายละเอียด</th><th style="width:14%">ยอดเอกสาร</th><th style="width:12%">หัก ณ ที่จ่าย</th><th style="width:14%">จ่ายสุทธิ</th></tr></thead>
-        <tbody>${(voucherExpenses.length?voucherExpenses:[e]).filter(Boolean).map((item)=>`<tr>
+        <thead><tr><th style="width:8%">วันที่</th><th style="width:14%">เลขเอกสาร</th><th>รายละเอียด</th><th style="width:14%">ยอดงวดนี้</th><th style="width:12%">หัก ณ ที่จ่าย</th><th style="width:14%">จ่ายสุทธิ</th></tr></thead>
+        <tbody>${(voucherExpenses.length?voucherExpenses:[e]).filter(Boolean).map((item)=>{const a=allocationMap[item.id]||{};return `<tr>
           <td>${thaiDate(item?.expense_date)}</td>
           <td>${item?.document_no||item?.expense_no||'-'}</td>
           <td>${item?.description||'-'}</td>
-          <td class="num">${money(item?.total_amount)}</td>
-          <td class="num">${money(item?.withholding_tax)}</td>
-          <td class="num"><b>${money(Math.max(Number(item?.total_amount||0)-Number(item?.withholding_tax||0),0))}</b></td>
-        </tr>`).join('')}</tbody>
+          <td class="num">${money(a.gross_amount??item?.total_amount)}</td>
+          <td class="num">${money(a.withholding_tax??0)}</td>
+          <td class="num"><b>${money(a.net_amount??Math.max(Number(a.gross_amount||0)-Number(a.withholding_tax||0),0))}</b></td>
+        </tr>`}).join('')}</tbody>
       </table>
 
       <table class="summary">
@@ -1893,8 +1904,15 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const voucherExpenses = voucherExpenseIds.map((id)=>expenseMap[id]).filter(Boolean);
     const e=voucherExpenses[0];
     const vendor=vendors.find((x)=>x.id===v.vendor_id);
+    const allocationByExpense = Object.fromEntries((v.allocations||[]).map((a)=>[a.expense_id,a]));
     const base=voucherExpenses.length
-      ? voucherExpenses.reduce((sum,item)=>sum + Number(item.subtotal||0),0)
+      ? voucherExpenses.reduce((sum,item)=>{
+          const allocation=allocationByExpense[item.id];
+          const gross=Number(allocation?.gross_amount ?? item.total_amount ?? 0);
+          const total=Number(item.total_amount||0);
+          const subtotal=Number(item.subtotal||0);
+          return sum + (total ? gross*subtotal/total : gross);
+        },0)
       : Number(v.gross_amount||0);
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
     const incomeLabel=v.income_type||voucherExpenses.map((item)=>item.description).join(' / ')||e?.description||'อื่น ๆ';
