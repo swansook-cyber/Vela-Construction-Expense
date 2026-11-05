@@ -1083,19 +1083,34 @@ function AuditPanel() {
 
 
 function printDocument(title, html) {
-  const win = window.open('', '_blank', 'width=1000,height=800');
+  const win = window.open('', '_blank', 'width=1100,height=900');
   if (!win) return;
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
   <style>
-    @page{size:A4;margin:14mm} body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111;margin:0}
+    @page{size:A4;margin:14mm}
+    body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111;margin:0;background:#eef1f3}
     h1,h2,h3,p{margin:0}.head{text-align:center;margin-bottom:22px}.head h2{font-size:24px}
     .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:18px 0}
     .line{display:flex;justify-content:space-between;border-bottom:1px solid #bbb;padding:8px 0}
     .amount{font-size:22px;font-weight:700}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:55px;text-align:center}
     .sign div{padding-top:35px;border-top:1px dotted #333}.cheque{width:190mm;height:82mm;border:1px dashed #999;padding:12mm;position:relative}
     .cheque .date{text-align:right}.cheque .payee{font-size:20px;margin-top:18px}.cheque .num{position:absolute;right:12mm;top:42mm;font-size:22px;font-weight:700}
-    .note{font-size:11px;color:#666;margin-top:8px}@media print{button{display:none}}
-  </style></head><body>${html}<script>window.onload=()=>window.print()<\/script></body></html>`);
+    .note{font-size:11px;color:#666;margin-top:8px}
+    .preview-toolbar{position:sticky;top:0;z-index:99;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;background:#17212b;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+    .preview-toolbar strong{font-size:14px}.preview-actions{display:flex;gap:8px}
+    .preview-actions button{border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}
+    .preview-actions .print{background:#fff;color:#17212b}.preview-actions .close{background:#3b4650;color:#fff}
+    .preview-sheet{width:210mm;min-height:297mm;margin:18px auto;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.16)}
+    @media print{
+      body{background:#fff}
+      .preview-toolbar{display:none!important}
+      .preview-sheet{width:auto;min-height:0;margin:0;box-shadow:none}
+      button{display:none}
+    }
+  </style></head><body>
+    <div class="preview-toolbar"><strong>ตัวอย่างก่อนพิมพ์ — ${title}</strong><div class="preview-actions"><button class="print" onclick="window.print()">พิมพ์</button><button class="close" onclick="window.close()">ปิด</button></div></div>
+    <div class="preview-sheet">${html}</div>
+  </body></html>`);
   win.document.close();
 }
 
