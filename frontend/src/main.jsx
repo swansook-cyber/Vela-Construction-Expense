@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import * as XLSX from 'xlsx';
 import './style.css';
 
 const api = async (path, options = {}) => {
@@ -992,6 +993,74 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     URL.revokeObjectURL(url);
   }
 
+  function exportAccountingXlsx() {
+    const header = [
+      'วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code',
+      'ผู้ขาย/ผู้รับเหมา','เลขประจำตัวผู้เสียภาษี','ประเภทผู้รับเงิน',
+      'ก่อน VAT','VAT','ยอดเอกสาร','WHT','จ่ายสุทธิ','สถานะ',
+      'วิธีจ่าย','เลขที่ใบสำคัญจ่าย','เลขที่ 50 ทวิ','ธนาคาร','เลขที่เช็ค','วันที่เช็ค','หมายเหตุ'
+    ];
+    const rows = filtered.map((e) => {
+      const code = costMap[e.cost_code_id];
+      const vendor = vendorMap[e.vendor_id];
+      const voucher = voucherByExpense[e.id];
+      return [
+        thaiDate(e.expense_date),
+        String(e.expense_no || ''),
+        String(e.document_no || ''),
+        e.description || '',
+        code ? `${code.code} ${code.name}` : '',
+        vendor?.name || '',
+        String(vendor?.tax_id || ''),
+        vendor?.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : vendor?.entity_type === 'JURISTIC' ? 'นิติบุคคล' : '',
+        Number(e.subtotal || 0),
+        Number(e.vat_amount || 0),
+        Number(e.total_amount || 0),
+        Number(e.withholding_tax || 0),
+        Number(voucher?.net_amount ?? e.net_paid ?? 0),
+        e.payment_status || '',
+        voucher?.payment_method || e.payment_method || '',
+        String(voucher?.voucher_no || ''),
+        String(voucher?.wht_certificate_no || ''),
+        voucher?.bank_name || '',
+        String(voucher?.cheque_no || ''),
+        voucher?.cheque_date ? thaiDate(voucher.cheque_date) : '',
+        voucher?.notes || e.notes || ''
+      ];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(rows.length,1),c:header.length-1}}) };
+    ws['!cols'] = [
+      {wch:12},{wch:16},{wch:16},{wch:34},{wch:24},{wch:28},{wch:18},{wch:16},
+      {wch:14},{wch:12},{wch:14},{wch:12},{wch:14},{wch:12},{wch:14},{wch:18},
+      {wch:18},{wch:20},{wch:16},{wch:14},{wch:30}
+    ];
+
+    // Force identifier-like columns to text so Excel preserves leading zeros.
+    const textCols = [1,2,6,15,16,18];
+    for (let r = 1; r <= rows.length; r++) {
+      for (const c of textCols) {
+        const cell = ws[XLSX.utils.encode_cell({r,c})];
+        if (cell) {
+          cell.t = 's';
+          cell.v = String(cell.v ?? '');
+          delete cell.w;
+        }
+      }
+      for (const c of [8,9,10,11,12]) {
+        const cell = ws[XLSX.utils.encode_cell({r,c})];
+        if (cell) cell.z = '#,##0.00';
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Accounting');
+    const filename = `${project?.code || 'SEA-MOUNTAIN'}-${month || 'all'}-accounting.xlsx`;
+    XLSX.writeFile(wb, filename);
+  }
+
   return (
     <section className="panel report-panel">
       <div className="report-screen-head no-print">
@@ -999,6 +1068,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
         <div className="report-actions">
           <button className="ghost" onClick={exportFilteredCsv}>Export CSV</button>
           <button className="ghost" onClick={exportAccountingCsv}>ส่งสำนักงานบัญชี CSV</button>
+          <button className="ghost" onClick={exportAccountingXlsx}>ส่งสำนักงานบัญชี Excel</button>
           <button onClick={() => window.print()}>Print / PDF</button>
         </div>
       </div>
