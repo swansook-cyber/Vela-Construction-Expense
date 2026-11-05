@@ -1285,33 +1285,55 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const vendor=vendors.find((x)=>x.id===v.vendor_id);
     const method=({TRANSFER:'โอนเงิน',CASH:'เงินสด',CHEQUE:'เช็ค',CREDIT:'เครดิต / เจ้าหนี้'})[v.payment_method]||v.payment_method||'-';
     printDocument(v.voucher_no,`<style>
-      @page{size:A4 portrait;margin:12mm}
-      body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000;font-size:11px}
-      .pv{border:1.4px solid #000;padding:12px}
-      .pv-head{display:grid;grid-template-columns:1.35fr .9fr 1fr;align-items:start;gap:14px;border-bottom:1px solid #000;padding-bottom:10px}
-      .pv-head .company{font-size:11px;line-height:1.45;overflow-wrap:normal;word-break:normal}.pv-head .title{text-align:center}.pv-head .title h1{font-size:22px;margin:0}.pv-head .meta{text-align:right;line-height:1.7}
-      .pv-party{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid #000}.pv-party div{padding:7px 8px}.pv-party .label{font-weight:700;border-right:1px solid #000}
-      .pv-table{width:100%;border-collapse:collapse;margin-top:10px}.pv-table th,.pv-table td{border:1px solid #000;padding:7px;vertical-align:top}
-      .pv-table th{background:#f3f3f3}.pv-table td.num{text-align:right;white-space:nowrap}
-      .pv-summary{margin-top:10px;margin-left:auto;width:48%;border-collapse:collapse}.pv-summary td{border:1px solid #000;padding:7px}.pv-summary td:last-child{text-align:right;font-weight:700}
-      .pv-pay{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.pv-pay div{border:1px solid #000;padding:8px;min-height:38px}
-      .pv-sign{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:42px;text-align:center}.pv-sign div{border-top:1px dotted #000;padding-top:8px}
-      .pv-note{margin-top:8px;font-size:9px;color:#333}
+      @page{size:A4 portrait;margin:10mm}
+      html,body{margin:0;padding:0}
+      body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000;font-size:10.5px}
+      .pv-page{height:277mm;border:1.2px solid #000;padding:8mm;display:flex;flex-direction:column}
+      .pv-head{display:grid;grid-template-columns:1.45fr .9fr .9fr;align-items:start;gap:10px;border-bottom:1px solid #000;padding-bottom:7px}
+      .company{font-size:10.5px;line-height:1.45}.company b{font-size:12px}
+      .title{text-align:center}.title h1{font-size:22px;margin:0;line-height:1.1}.title b{font-size:10px}
+      .meta{display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center}.meta span{font-weight:700}.meta b{border-bottom:1px solid #000;padding:1px 4px;text-align:right}
+      .party{display:grid;grid-template-columns:135px 1fr;border-bottom:1px solid #000}.party div{padding:6px 7px}.party .label{font-weight:700;border-right:1px solid #000}
+      .payment-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid #000}
+      .payment-row div{padding:6px 7px;border-right:1px solid #000}.payment-row div:last-child{border-right:0}
+      table{width:100%;border-collapse:collapse}
+      .items{margin-top:8px}.items th,.items td{border:1px solid #000;padding:6px;vertical-align:top}
+      .items th{background:#f4f4f4;text-align:center}.num{text-align:right;white-space:nowrap}
+      .summary{width:48%;margin:8px 0 0 auto}.summary td{border:1px solid #000;padding:6px}.summary td:last-child{text-align:right;font-weight:700}
+      .spacer{flex:1;min-height:56mm}
+      .explain{border:1px solid #000;padding:8px;margin-top:8px;min-height:18mm}
+      .sign{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #000;border-right:0;margin-top:8px}
+      .sign .cell{border-right:1px solid #000;text-align:center;min-height:35mm;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+      .sign .role{font-weight:700}.sign .date{font-size:9px}
+      .warning{margin-top:7px;border:1px solid #a33;color:#a33;padding:6px;font-weight:700}
+      .foot{font-size:8.5px;color:#333;margin-top:5px}
     </style>
-    <div class="pv">
+    <div class="pv-page">
       <div class="pv-head">
-        <div class="company"><b>${company?.legal_name||'Sea Mountain'}</b><br>${company?.address||''}<br>เลขประจำตัวผู้เสียภาษี ${company?.tax_id||'-'}</div>
+        <div class="company"><b>${company?.legal_name||'Sea Mountain'}</b><br>${company?.address||''}<br>เลขประจำตัวผู้เสียภาษี ${company?.tax_id||'-'}${company?.phone? `<br>โทร. ${company.phone}`:''}</div>
         <div class="title"><h1>ใบสำคัญจ่าย</h1><b>PAYMENT VOUCHER</b></div>
-        <div class="meta">เลขที่ <b>${v.voucher_no}</b><br>วันที่ <b>${thaiDate(v.voucher_date)}</b></div>
+        <div class="meta"><span>เลขที่</span><b>${v.voucher_no}</b><span>วันที่</span><b>${thaiDate(v.voucher_date)}</b></div>
       </div>
 
-      <div class="pv-party"><div class="label">จ่ายให้ / Pay to</div><div><b>${v.payee_name}</b>${vendor?.tax_id? ` &nbsp; Tax ID: ${vendor.tax_id}`:''}</div></div>
-      <div class="pv-party"><div class="label">ที่อยู่</div><div>${vendor?.address||'-'}</div></div>
-      <div class="pv-party"><div class="label">อ้างอิงค่าใช้จ่าย</div><div>${e?.expense_no||'-'} &nbsp; | &nbsp; เอกสารเลขที่ ${e?.document_no||'-'}</div></div>
+      <div class="party"><div class="label">จ่ายให้ / PAY TO</div><div><b>${v.payee_name}</b>${vendor?.tax_id? ` &nbsp; Tax ID: ${vendor.tax_id}`:''}</div></div>
+      <div class="party"><div class="label">ที่อยู่</div><div>${vendor?.address||'-'}</div></div>
 
-      <table class="pv-table">
-        <thead><tr><th style="width:60%">รายละเอียด</th><th>ยอดเอกสาร</th><th>หัก ณ ที่จ่าย</th><th>จ่ายสุทธิ</th></tr></thead>
+      <div class="payment-row">
+        <div><b>วิธีจ่าย:</b> ${method}</div>
+        <div><b>ธนาคาร:</b> ${v.bank_name||'-'}</div>
+        <div><b>เลขที่เช็ค / อ้างอิง:</b> ${v.cheque_no||'-'}</div>
+      </div>
+      <div class="payment-row">
+        <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
+        <div><b>อ้างอิงค่าใช้จ่าย:</b> ${e?.expense_no||'-'}</div>
+        <div><b>เอกสารเลขที่:</b> ${e?.document_no||'-'}</div>
+      </div>
+
+      <table class="items">
+        <thead><tr><th style="width:8%">วันที่</th><th style="width:14%">เลขเอกสาร</th><th>รายละเอียด</th><th style="width:14%">ยอดเอกสาร</th><th style="width:12%">หัก ณ ที่จ่าย</th><th style="width:14%">จ่ายสุทธิ</th></tr></thead>
         <tbody><tr>
+          <td>${thaiDate(e?.expense_date)}</td>
+          <td>${e?.document_no||'-'}</td>
           <td>${e?.description||'-'}${v.income_type? `<br><small>ประเภทเงินได้: ${v.income_type}</small>`:''}</td>
           <td class="num">${money(v.gross_amount)}</td>
           <td class="num">${money(v.withholding_tax)}</td>
@@ -1319,22 +1341,25 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         </tr></tbody>
       </table>
 
-      <table class="pv-summary">
+      <table class="summary">
         <tr><td>ยอดเอกสาร</td><td>${money(v.gross_amount)}</td></tr>
         <tr><td>หัก ณ ที่จ่าย</td><td>- ${money(v.withholding_tax)}</td></tr>
         <tr><td><b>ยอดจ่ายสุทธิ</b></td><td><b>${money(v.net_amount)}</b></td></tr>
       </table>
 
-      ${v.payment_method==='CHEQUE' && (!v.cheque_no || !v.bank_name) ? '<div style="margin-top:10px;border:1px solid #a33;padding:8px;color:#a33;font-weight:700">ข้อมูลเช็คยังไม่ครบ — กรุณาระบุธนาคารและเลขที่เช็คก่อนใช้เอกสารฉบับนี้จริง</div>' : ''}
-      <div class="pv-pay">
-        <div><b>วิธีจ่าย:</b> ${method}</div>
-        <div><b>เลขที่เช็ค / อ้างอิง:</b> ${v.cheque_no||'-'}</div>
-        <div><b>ธนาคาร:</b> ${v.bank_name||'-'}</div>
-        <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
-      </div>
+      ${v.payment_method==='CHEQUE' && (!v.cheque_no || !v.bank_name) ? '<div class="warning">ข้อมูลเช็คยังไม่ครบ — กรุณาระบุธนาคารและเลขที่เช็คก่อนใช้เอกสารฉบับนี้จริง</div>' : ''}
 
-      ${v.notes? `<div class="pv-note"><b>หมายเหตุ:</b> ${v.notes}</div>`:''}
-      <div class="pv-sign"><div>ผู้จัดทำ</div><div>ผู้อนุมัติ</div><div>ผู้รับเงิน</div></div>
+      <div class="spacer"></div>
+
+      <div class="explain"><b>คำอธิบาย / Explanation</b><br>${v.notes||e?.description||'-'}</div>
+
+      <div class="sign">
+        <div class="cell"><div class="role">ผู้จัดทำ / Prepared By</div><div>........................................</div><div class="date">วันที่ ....../....../......</div></div>
+        <div class="cell"><div class="role">ผู้ตรวจสอบ / Checked By</div><div>........................................</div><div class="date">วันที่ ....../....../......</div></div>
+        <div class="cell"><div class="role">ผู้อนุมัติ / Approved By</div><div>........................................</div><div class="date">วันที่ ....../....../......</div></div>
+        <div class="cell"><div class="role">ผู้รับเงิน / Received By</div><div>........................................</div><div class="date">วันที่ ....../....../......</div></div>
+      </div>
+      <div class="foot">${company?.legal_name||'Sea Mountain'} — Payment Voucher ${v.voucher_no}</div>
     </div>`);
   }
 
