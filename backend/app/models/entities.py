@@ -19,6 +19,18 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class CompanyProfile(Base):
+    __tablename__ = "company_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    legal_name: Mapped[str] = mapped_column(String(255), default="Sea Mountain")
+    tax_id: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class CostCode(Base):
     __tablename__ = "cost_codes"
 
@@ -87,6 +99,8 @@ class PaymentVoucher(Base):
     voucher_date: Mapped[date] = mapped_column(Date)
     gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    wht_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    income_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     net_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
     payee_name: Mapped[str] = mapped_column(String(255))
