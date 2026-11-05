@@ -129,11 +129,13 @@ class PaymentVoucher(Base):
 
 class PaymentVoucherItem(Base):
     __tablename__ = "payment_voucher_items"
-    __table_args__ = (UniqueConstraint("expense_id", name="uq_payment_voucher_item_expense"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     voucher_id: Mapped[int] = mapped_column(ForeignKey("payment_vouchers.id", ondelete="CASCADE"), index=True)
     expense_id: Mapped[int] = mapped_column(ForeignKey("expenses.id"), index=True)
+    gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    net_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     voucher = relationship("PaymentVoucher", back_populates="items")
