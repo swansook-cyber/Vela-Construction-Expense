@@ -1741,7 +1741,6 @@ function App() {
       <nav className="tabs">
         <button className={active === 'expenses' ? 'active' : ''} onClick={() => setActive('expenses')}>ค่าใช้จ่าย</button>
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
-        <button className={active === 'documents' ? 'active' : ''} onClick={() => setActive('documents')}>เอกสาร</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
         <button className={active === 'wht' ? 'active' : ''} onClick={() => setActive('wht')}>หัก ณ ที่จ่าย</button>
         <button className={active === 'voucher' ? 'active' : ''} onClick={() => setActive('voucher')}>ใบสำคัญจ่าย</button>
