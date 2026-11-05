@@ -1791,7 +1791,6 @@ function App() {
   const [costCodes, setCostCodes] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [summary, setSummary] = useState(null);
   const [showExpense, setShowExpense] = useState(false);
   const [showVendor, setShowVendor] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
@@ -1818,9 +1817,8 @@ function App() {
       setCostCodes(c);
       setVendors(v);
       if (p[0]) {
-        const [e, s] = await Promise.all([api(`/expenses?project_id=${p[0].id}`), api(`/dashboard/${p[0].id}`)]);
+        const e = await api(`/expenses?project_id=${p[0].id}`);
         setExpenses(e);
-        setSummary(s);
       }
     } catch (err) {
       setError(err.message);
@@ -1881,11 +1879,24 @@ function App() {
 
   useEffect(() => { setExpensePage(1); }, [expenseSearch, expenseMonth, expenseCostCode, expenseVendor, expenseStatus, expensePageSize]);
 
+  const dashboardSummary = useMemo(() => expenses
+    .filter((e) => e.payment_status !== 'VOID')
+    .reduce((acc, e) => {
+      const total = Number(e.total_amount || 0);
+      const wht = Number(e.withholding_tax || 0);
+      const paid = Number(e.net_paid || 0);
+      acc.total += total;
+      acc.wht += wht;
+      acc.paid += paid;
+      acc.outstanding += Math.max(total - wht - paid, 0);
+      return acc;
+    }, { total: 0, wht: 0, paid: 0, outstanding: 0 }), [expenses]);
+
   const cards = [
-    ['ต้นทุนตามเอกสาร', money(summary?.total_expenses)],
-    ['จ่ายผู้ขายสุทธิ', money(summary?.paid_amount)],
-    ['หัก ณ ที่จ่าย', money(summary?.withholding_tax)],
-    ['ยอดค้างผู้ขาย', money(summary?.outstanding_amount)],
+    ['ต้นทุนตามเอกสาร', money(dashboardSummary.total)],
+    ['จ่ายผู้ขายสุทธิ', money(dashboardSummary.paid)],
+    ['หัก ณ ที่จ่าย', money(dashboardSummary.wht)],
+    ['ยอดค้างผู้ขาย', money(dashboardSummary.outstanding)],
   ];
 
   return (
