@@ -855,6 +855,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
   const [vendorId, setVendorId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [view, setView] = useState('DETAIL');
+  const [reportType, setReportType] = useState('EXPENSE');
   const [vouchers, setVouchers] = useState([]);
 
   useEffect(() => {
@@ -922,6 +923,92 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     const parts = month.split('-').map(Number);
     return new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(parts[0], parts[1] - 1, 1));
   }, [month]);
+
+  const whtRows = useMemo(() => vouchers.filter((v) => {
+    if (Number(v.withholding_tax || 0) <= 0) return false;
+    if (month && !String(v.voucher_date || '').startsWith(month)) return false;
+    const vendor = vendorMap[v.vendor_id];
+    if (reportType === 'WHT3' && vendor?.entity_type !== 'INDIVIDUAL') return false;
+    if (reportType === 'WHT53' && vendor?.entity_type !== 'JURISTIC') return false;
+    return reportType === 'WHT3' || reportType === 'WHT53';
+  }).map((v) => {
+    const e = expenses.find((x) => x.id === v.expense_id);
+    const vendor = vendorMap[v.vendor_id];
+    const base = Number(e?.subtotal || v.gross_amount || 0);
+    const tax = Number(v.withholding_tax || 0);
+    const rate = v.wht_rate != null ? Number(v.wht_rate) : (base ? tax / base * 100 : 0);
+    return { voucher:v, expense:e, vendor, base, tax, rate };
+  }), [vouchers, expenses, vendorMap, month, reportType]);
+
+  const vatRows = useMemo(() => expenses.filter((e) => {
+    if (e.payment_status === 'VOID') return false;
+    if (Number(e.vat_amount || 0) <= 0) return false;
+    if (month && !String(e.expense_date || '').startsWith(month)) return false;
+    return true;
+  }).map((e) => ({ expense:e, vendor:vendorMap[e.vendor_id] })), [expenses, vendorMap, month]);
+
+  const whtTotals = useMemo(() => whtRows.reduce((acc, r) => {
+    acc.base += r.base; acc.tax += r.tax; return acc;
+  }, { base:0, tax:0 }), [whtRows]);
+
+  const vatTotals = useMemo(() => vatRows.reduce((acc, r) => {
+    acc.subtotal += Number(r.expense.subtotal || 0);
+    acc.vat += Number(r.expense.vat_amount || 0);
+    acc.total += Number(r.expense.total_amount || 0);
+    return acc;
+  }, { subtotal:0, vat:0, total:0 }), [vatRows]);
+
+  const reportTitle = reportType === 'WHT3' ? 'สรุปภาษีหัก ณ ที่จ่าย — ภ.ง.ด.3'
+    : reportType === 'WHT53' ? 'สรุปภาษีหัก ณ ที่จ่าย — ภ.ง.ด.53'
+    : reportType === 'VAT' ? 'รายงานภาษีซื้อ VAT'
+    : 'รายงานค่าใช้จ่าย';
+
+  function exportTaxXlsx() {
+    let header = [];
+    let rows = [];
+    let sheetName = 'Tax Report';
+
+    if (reportType === 'WHT3' || reportType === 'WHT53') {
+      header = ['วันที่จ่าย','เลขที่ 50 ทวิ','ผู้รับเงิน','เลขประจำตัวผู้เสียภาษี','ประเภทเงินได้','ฐานภาษี','อัตรา WHT (%)','ภาษีหัก ณ ที่จ่าย','เลขที่ใบสำคัญจ่าย','เลขที่เอกสาร'];
+      rows = whtRows.map((r) => [
+        thaiDate(r.voucher.voucher_date),
+        String(r.voucher.wht_certificate_no || '').trim(),
+        String(r.vendor?.name || r.voucher.payee_name || '').trim(),
+        String(r.vendor?.tax_id || '').trim(),
+        String(r.voucher.income_type || r.expense?.description || '').trim(),
+        r.base,
+        r.rate,
+        r.tax,
+        String(r.voucher.voucher_no || '').trim(),
+        String(r.expense?.document_no || '').trim()
+      ]);
+      sheetName = reportType === 'WHT3' ? 'PND3 Summary' : 'PND53 Summary';
+    } else if (reportType === 'VAT') {
+      header = ['วันที่เอกสาร','เลขที่เอกสาร/ใบกำกับภาษี','ผู้ขาย','เลขประจำตัวผู้เสียภาษี','รายละเอียด','มูลค่าก่อน VAT','VAT','ยอดรวม'];
+      rows = vatRows.map((r) => [
+        thaiDate(r.expense.expense_date),
+        String(r.expense.document_no || '').trim(),
+        String(r.vendor?.name || '').trim(),
+        String(r.vendor?.tax_id || '').trim(),
+        String(r.expense.description || '').trim(),
+        Number(r.expense.subtotal || 0),
+        Number(r.expense.vat_amount || 0),
+        Number(r.expense.total_amount || 0)
+      ]);
+      sheetName = 'VAT Purchase';
+    } else {
+      exportAccountingXlsx();
+      return;
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!freeze'] = { xSplit:0, ySplit:1 };
+    ws['!autofilter'] = { ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(rows.length,1),c:header.length-1}}) };
+    ws['!cols'] = header.map((h) => ({wch:Math.max(14, Math.min(34, h.length + 8))}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${project?.code || 'SEA-MOUNTAIN'}-${month || 'all'}-${reportType.toLowerCase()}.xlsx`);
+  }
 
   function exportFilteredCsv() {
     const header = ['วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code','ผู้ขาย','ก่อน VAT','VAT','WHT','ยอดรวม','จ่ายแล้ว','ค้างจ่าย','สถานะ'];
@@ -1065,15 +1152,23 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
   return (
     <section className="panel report-panel">
       <div className="report-screen-head no-print">
-        <div><h2>รายงานค่าใช้จ่าย</h2><p>กรองข้อมูล ตรวจยอด และส่งต่อสำนักงานบัญชี</p></div>
+        <div><h2>{reportTitle}</h2><p>{reportType === 'EXPENSE' ? 'กรองข้อมูล ตรวจยอด และส่งต่อสำนักงานบัญชี' : 'สรุปรายเดือนสำหรับตรวจสอบและส่งสำนักงานบัญชี'}</p></div>
         <div className="report-actions">
-          <button className="report-primary" onClick={exportAccountingXlsx}>Excel สำหรับสำนักงานบัญชี</button>
+          <button className="report-primary" onClick={reportType === 'EXPENSE' ? exportAccountingXlsx : exportTaxXlsx}>{reportType === 'EXPENSE' ? 'Excel สำหรับสำนักงานบัญชี' : 'ส่งออก Excel'}</button>
           <button className="ghost" onClick={() => window.print()}>พิมพ์ / PDF</button>
           <details className="export-menu"><summary>ส่งออกอื่น ๆ</summary><div className="export-menu-popover"><button onClick={exportFilteredCsv}>รายงาน CSV</button><button onClick={exportAccountingCsv}>สำนักงานบัญชี CSV</button></div></details>
         </div>
       </div>
 
       <div className="report-filters no-print">
+        <label>ประเภทรายงาน
+          <select value={reportType} onChange={(e) => setReportType(e.target.value)}>
+            <option value="EXPENSE">ค่าใช้จ่ายทั่วไป</option>
+            <option value="WHT3">WHT — ภ.ง.ด.3</option>
+            <option value="WHT53">WHT — ภ.ง.ด.53</option>
+            <option value="VAT">ภาษีซื้อ VAT</option>
+          </select>
+        </label>
         <label>ช่วงเวลา
           <select value={month} onChange={(e) => setMonth(e.target.value)}>
             <option value="">ทั้งหมด — ไม่ระบุเดือน</option>
@@ -1084,42 +1179,45 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
             })}
           </select>
         </label>
-        <label>Cost Code
-          <select value={costCodeId} onChange={(e) => setCostCodeId(e.target.value)}>
-            <option value="">ทั้งหมด</option>
-            {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-          </select>
-        </label>
-        <label>ผู้ขาย
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-            <option value="">ทั้งหมด</option>
-            {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
-        </label>
-        <label>สถานะ
-          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
-            <option value="">ทั้งหมด</option>
-            <option value="UNPAID">ยังไม่จ่าย</option>
-            <option value="PARTIAL">จ่ายบางส่วน</option>
-            <option value="PAID">จ่ายแล้ว</option>
-          </select>
-        </label>
-        <label>รูปแบบ
-          <select value={view} onChange={(e) => setView(e.target.value)}>
-            <option value="DETAIL">รายละเอียดค่าใช้จ่าย</option>
-            <option value="SUMMARY">สรุปตาม Cost Code</option>
-          </select>
-        </label>
+        {reportType === 'EXPENSE' && <>
+          <label>Cost Code
+            <select value={costCodeId} onChange={(e) => setCostCodeId(e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              {costCodes.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+            </select>
+          </label>
+          <label>ผู้ขาย
+            <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </label>
+          <label>สถานะ
+            <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              <option value="UNPAID">ยังไม่จ่าย</option>
+              <option value="PARTIAL">จ่ายบางส่วน</option>
+              <option value="PAID">จ่ายแล้ว</option>
+            </select>
+          </label>
+          <label>รูปแบบ
+            <select value={view} onChange={(e) => setView(e.target.value)}>
+              <option value="DETAIL">รายละเอียดค่าใช้จ่าย</option>
+              <option value="SUMMARY">สรุปตาม Cost Code</option>
+            </select>
+          </label>
+        </>}
         <button className="ghost report-clear" onClick={() => { setMonth(''); setCostCodeId(''); setVendorId(''); setPaymentStatus(''); }}>ล้างตัวกรอง</button>
       </div>
 
       <div className="report-print">
         <div className="print-title">
           <h2>{project?.name || 'Sea Mountain'}</h2>
+          <h3>{reportTitle}</h3>
           <p>{month ? `ประจำเดือน ${monthLabel}` : monthLabel}</p>
         </div>
 
-        {view === 'DETAIL' ? (
+        {reportType === 'EXPENSE' ? (view === 'DETAIL' ? (
           <div className="table-wrap report-table-wrap">
             <table className="report-table detail-report">
               <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>เลขที่เอกสาร</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
@@ -1151,6 +1249,30 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
               </tbody>
               {grouped.length > 0 && <tfoot><tr><th colSpan="3">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
             </table>
+          </div>
+        )) : reportType === 'VAT' ? (
+          <div className="table-wrap report-table-wrap">
+            <table className="report-table">
+              <thead><tr><th>วันที่เอกสาร</th><th>เลขที่เอกสาร/ใบกำกับภาษี</th><th>ผู้ขาย</th><th>Tax ID</th><th>รายละเอียด</th><th>ก่อน VAT</th><th>VAT</th><th>ยอดรวม</th></tr></thead>
+              <tbody>
+                {vatRows.length === 0 && <tr><td colSpan="8" className="empty">ไม่มีรายการ VAT ตามช่วงเวลาที่เลือก</td></tr>}
+                {vatRows.map(({expense:e,vendor}) => <tr key={e.id}><td>{thaiDate(e.expense_date)}</td><td>{e.document_no || '-'}</td><td>{vendor?.name || '-'}</td><td className="mono">{vendor?.tax_id || '-'}</td><td>{e.description}</td><td className="amount">{money(e.subtotal)}</td><td className="amount">{money(e.vat_amount)}</td><td className="amount">{money(e.total_amount)}</td></tr>)}
+              </tbody>
+              {vatRows.length > 0 && <tfoot><tr><th colSpan="5">รวม</th><th className="amount">{money(vatTotals.subtotal)}</th><th className="amount">{money(vatTotals.vat)}</th><th className="amount">{money(vatTotals.total)}</th></tr></tfoot>}
+            </table>
+            <p className="tax-report-note">รายงานนี้เป็นสรุปภายในจากรายการที่บันทึก VAT ในระบบ กรุณาตรวจสอบใบกำกับภาษีต้นฉบับก่อนใช้ยื่นภาษี</p>
+          </div>
+        ) : (
+          <div className="table-wrap report-table-wrap">
+            <table className="report-table">
+              <thead><tr><th>วันที่จ่าย</th><th>เลขที่ 50 ทวิ</th><th>ผู้รับเงิน</th><th>Tax ID</th><th>ประเภทเงินได้</th><th>ฐานภาษี</th><th>อัตรา</th><th>WHT</th><th>PV</th></tr></thead>
+              <tbody>
+                {whtRows.length === 0 && <tr><td colSpan="9" className="empty">ไม่มีรายการหัก ณ ที่จ่ายตามช่วงเวลาที่เลือก</td></tr>}
+                {whtRows.map((r) => <tr key={r.voucher.id}><td>{thaiDate(r.voucher.voucher_date)}</td><td>{r.voucher.wht_certificate_no || '-'}</td><td>{r.vendor?.name || r.voucher.payee_name}</td><td className="mono">{r.vendor?.tax_id || '-'}</td><td>{r.voucher.income_type || r.expense?.description || '-'}</td><td className="amount">{money(r.base)}</td><td className="amount">{r.rate.toFixed(2)}%</td><td className="amount">{money(r.tax)}</td><td>{r.voucher.voucher_no}</td></tr>)}
+              </tbody>
+              {whtRows.length > 0 && <tfoot><tr><th colSpan="5">รวม</th><th className="amount">{money(whtTotals.base)}</th><th></th><th className="amount">{money(whtTotals.tax)}</th><th></th></tr></tfoot>}
+            </table>
+            <p className="tax-report-note">รายงานนี้เป็นสรุปภายในสำหรับตรวจสอบ/ส่งสำนักงานบัญชี ไม่ใช่แบบยื่น ภ.ง.ด. อย่างเป็นทางการ</p>
           </div>
         )}
 
