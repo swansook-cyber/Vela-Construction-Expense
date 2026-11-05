@@ -174,7 +174,7 @@ textarea { resize: vertical; }
   @page { size: A4 landscape; margin: 10mm; }
   body { background:white !important; }
   main { max-width:none; padding:0; }
-  main > header, .grid, .tabs, .no-print { display:none !important; }
+  main > header, .grid, .metric-grid, .tabs, .no-print { display:none !important; }
   .report-panel { border:0; box-shadow:none; margin:0; padding:0; }
   .report-print { display:block !important; }
   .report-table-wrap { overflow:visible !important; }
