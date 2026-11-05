@@ -1067,6 +1067,182 @@ function AuditPanel() {
   );
 }
 
+
+function printDocument(title, html) {
+  const win = window.open('', '_blank', 'width=1000,height=800');
+  if (!win) return;
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+  <style>
+    @page{size:A4;margin:14mm} body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111;margin:0}
+    h1,h2,h3,p{margin:0}.head{text-align:center;margin-bottom:22px}.head h2{font-size:24px}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:18px 0}
+    .line{display:flex;justify-content:space-between;border-bottom:1px solid #bbb;padding:8px 0}
+    .amount{font-size:22px;font-weight:700}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:55px;text-align:center}
+    .sign div{padding-top:35px;border-top:1px dotted #333}.cheque{width:190mm;height:82mm;border:1px dashed #999;padding:12mm;position:relative}
+    .cheque .date{text-align:right}.cheque .payee{font-size:20px;margin-top:18px}.cheque .num{position:absolute;right:12mm;top:42mm;font-size:22px;font-weight:700}
+    .note{font-size:11px;color:#666;margin-top:8px}@media print{button{display:none}}
+  </style></head><body>${html}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  win.document.close();
+}
+
+function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, onSaved }) {
+  const used = new Set(vouchers.map((v) => v.expense_id));
+  const eligible = expenses.filter((e) => e.payment_status !== 'VOID' && !used.has(e.id));
+  const [expenseId, setExpenseId] = useState(eligible[0]?.id || '');
+  const selected = eligible.find((e) => String(e.id) === String(expenseId));
+  const vendor = vendors.find((v) => v.id === selected?.vendor_id);
+  const [form, setForm] = useState({
+    voucher_date: today(),
+    whtRate: selected?.withholding_tax && Number(selected.subtotal) ? String(Math.round(Number(selected.withholding_tax) / Number(selected.subtotal) * 100)) : '0',
+    payment_method: selected?.payment_method || 'TRANSFER',
+    payee_name: vendor?.name || '',
+    cheque_no: '',
+    cheque_date: today(),
+    bank_name: '',
+    notes: '',
+  });
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const e = eligible.find((x) => String(x.id) === String(expenseId));
+    const v = vendors.find((x) => x.id === e?.vendor_id);
+    setForm((old) => ({
+      ...old,
+      payee_name: v?.name || e?.description || '',
+      payment_method: e?.payment_method || old.payment_method || 'TRANSFER',
+      whtRate: e?.withholding_tax && Number(e.subtotal) ? String(Math.round(Number(e.withholding_tax) / Number(e.subtotal) * 100)) : '0',
+    }));
+  }, [expenseId]);
+
+  const subtotal = Number(selected?.subtotal || 0);
+  const gross = Number(selected?.total_amount || 0);
+  const wht = subtotal * Number(form.whtRate || 0) / 100;
+  const net = Math.max(gross - wht, 0);
+  const set = (k,v) => setForm((x) => ({...x,[k]:v}));
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!selected || !project) return;
+    setError('');
+    try {
+      await api('/payment-vouchers', {
+        method:'POST',
+        body: JSON.stringify({
+          project_id: project.id,
+          expense_id: selected.id,
+          vendor_id: selected.vendor_id || null,
+          voucher_date: form.voucher_date,
+          gross_amount: gross.toFixed(2),
+          withholding_tax: wht.toFixed(2),
+          net_amount: net.toFixed(2),
+          payment_method: form.payment_method || null,
+          payee_name: form.payee_name,
+          cheque_no: form.payment_method === 'CHEQUE' ? (form.cheque_no || null) : null,
+          cheque_date: form.payment_method === 'CHEQUE' ? form.cheque_date : null,
+          bank_name: form.payment_method === 'CHEQUE' ? (form.bank_name || null) : null,
+          notes: form.notes || null,
+        })
+      });
+      await onSaved();
+    } catch(err) { setError(err.message); }
+  }
+
+  return <div className="modal-backdrop" onMouseDown={onClose}>
+    <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="modal-head"><div><p className="eyebrow">Payment Voucher</p><h2>ออกใบสำคัญจ่าย</h2></div><button className="ghost icon" onClick={onClose}>×</button></div>
+      <form className="form-grid" onSubmit={submit}>
+        <label className="wide">รายการค่าใช้จ่าย
+          <select value={expenseId} onChange={(e)=>setExpenseId(e.target.value)} required>
+            {eligible.length===0 && <option value="">ไม่มีรายการที่รอออกใบสำคัญจ่าย</option>}
+            {eligible.map((e)=><option key={e.id} value={e.id}>{e.expense_no} — {e.description} — {money(e.total_amount)}</option>)}
+          </select>
+        </label>
+        <label>วันที่ใบสำคัญจ่าย<input type="date" value={form.voucher_date} onChange={(e)=>set('voucher_date',e.target.value)} required /></label>
+        <label>ผู้รับเงิน<input value={form.payee_name} onChange={(e)=>set('payee_name',e.target.value)} required /></label>
+        <label>หัก ณ ที่จ่าย
+          <select value={form.whtRate} onChange={(e)=>set('whtRate',e.target.value)}>
+            <option value="0">ไม่หัก</option><option value="1">1%</option><option value="3">3%</option><option value="5">5%</option>
+          </select>
+        </label>
+        <label>วิธีจ่าย
+          <select value={form.payment_method} onChange={(e)=>set('payment_method',e.target.value)}>
+            <option value="TRANSFER">โอน</option><option value="CASH">เงินสด</option><option value="CHEQUE">เช็ค</option>
+          </select>
+        </label>
+        {form.payment_method==='CHEQUE' && <>
+          <label>ธนาคาร<input value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} /></label>
+          <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} /></label>
+          <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} /></label>
+        </>}
+        <div className="calc wide">
+          <span>ยอดเอกสาร <b>{money(gross)}</b></span><span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span><span className="total-line">จ่ายสุทธิ <b>{money(net)}</b></span>
+        </div>
+        <label className="wide">หมายเหตุ<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} /></label>
+        {error && <div className="error wide">{error}</div>}
+        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button disabled={!selected}>ออกใบสำคัญจ่าย</button></div>
+      </form>
+    </div>
+  </div>;
+}
+
+function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) {
+  const [vouchers,setVouchers]=useState([]);
+  const [showCreate,setShowCreate]=useState(false);
+  const expenseMap=useMemo(()=>Object.fromEntries(expenses.map((e)=>[e.id,e])),[expenses]);
+
+  async function load() {
+    if (!project?.id) return;
+    setVouchers(await api(`/payment-vouchers?project_id=${project.id}`));
+  }
+  useEffect(()=>{ load(); },[project?.id]);
+
+  const rows = mode==='wht' ? vouchers.filter((v)=>Number(v.withholding_tax)>0)
+    : mode==='cheque' ? vouchers.filter((v)=>v.payment_method==='CHEQUE' || v.cheque_no)
+    : vouchers;
+
+  function printVoucher(v) {
+    const e=expenseMap[v.expense_id];
+    printDocument(v.voucher_no,`<div class="head"><h2>Sea Mountain</h2><h3>ใบสำคัญจ่าย</h3><p>${v.voucher_no}</p></div>
+      <div class="meta"><div class="line"><span>วันที่</span><b>${thaiDate(v.voucher_date)}</b></div><div class="line"><span>ผู้รับเงิน</span><b>${v.payee_name}</b></div>
+      <div class="line"><span>รายการ</span><b>${e?.description||''}</b></div><div class="line"><span>เลขที่เอกสาร</span><b>${e?.document_no||'-'}</b></div>
+      <div class="line"><span>ยอดเอกสาร</span><b>${money(v.gross_amount)}</b></div><div class="line"><span>หัก ณ ที่จ่าย</span><b>${money(v.withholding_tax)}</b></div></div>
+      <p class="amount">จ่ายสุทธิ ${money(v.net_amount)}</p>
+      <div class="sign"><div>ผู้จัดทำ</div><div>ผู้อนุมัติ</div><div>ผู้รับเงิน</div></div>`);
+  }
+
+  function printWht(v) {
+    const e=expenseMap[v.expense_id];
+    printDocument(v.wht_certificate_no||'WHT',`<div class="head"><h2>Sea Mountain</h2><h3>ใบรับรองการหักภาษี ณ ที่จ่าย</h3><p>${v.wht_certificate_no||''}</p></div>
+      <div class="meta"><div class="line"><span>ผู้ถูกหักภาษี</span><b>${v.payee_name}</b></div><div class="line"><span>วันที่</span><b>${thaiDate(v.voucher_date)}</b></div>
+      <div class="line"><span>รายละเอียด</span><b>${e?.description||''}</b></div><div class="line"><span>ฐานจ่าย</span><b>${money(e?.subtotal||v.gross_amount)}</b></div>
+      <div class="line"><span>ภาษีหัก ณ ที่จ่าย</span><b>${money(v.withholding_tax)}</b></div></div>
+      <p class="note">แบบพิมพ์ภายในระบบ กรุณาตรวจข้อมูลผู้จ่าย/ผู้รับและข้อกำหนดภาษีก่อนใช้ออกเอกสารทางการ</p>
+      <div class="sign"><div>ผู้จัดทำ</div><div>ผู้มีอำนาจลงนาม</div><div>ผู้รับเอกสาร</div></div>`);
+  }
+
+  function printCheque(v) {
+    printDocument(v.cheque_no||v.voucher_no,`<div class="cheque"><div class="date">${thaiDate(v.cheque_date||v.voucher_date)}</div>
+      <div class="payee">จ่าย <b>${v.payee_name}</b></div><div class="num">${money(v.net_amount)}</div>
+      <p class="note">ธนาคาร: ${v.bank_name||'-'} &nbsp; เลขที่เช็ค: ${v.cheque_no||'-'}</p></div>
+      <p class="note">ตำแหน่งพิมพ์เช็คเป็นแบบกลาง ต้องปรับระยะตามแบบเช็คของธนาคารก่อนพิมพ์บนเช็คจริง</p>`);
+  }
+
+  const title=mode==='wht'?'หัก ณ ที่จ่าย':mode==='cheque'?'พิมพ์เช็ค':'ใบสำคัญจ่าย';
+  return <section className="panel">
+    <div className="section-head"><div><h2>{title}</h2><p>{rows.length} รายการ</p></div>
+      {mode==='voucher' && <button onClick={()=>setShowCreate(true)}>+ ออกใบสำคัญจ่าย</button>}
+    </div>
+    <div className="table-wrap"><table><thead><tr><th>เลขที่</th><th>วันที่</th><th>ผู้รับเงิน</th><th>ยอดเอกสาร</th><th>WHT</th><th>จ่ายสุทธิ</th><th>วิธีจ่าย</th><th>พิมพ์</th></tr></thead>
+      <tbody>{rows.length===0&&<tr><td colSpan="8" className="empty">ยังไม่มีรายการ</td></tr>}
+      {rows.map((v)=><tr key={v.id}><td className="mono">{mode==='wht'?(v.wht_certificate_no||'-'):mode==='cheque'?(v.cheque_no||'-'):v.voucher_no}</td>
+        <td>{thaiDate(v.voucher_date)}</td><td>{v.payee_name}</td><td className="amount">{money(v.gross_amount)}</td><td className="amount">{money(v.withholding_tax)}</td><td className="amount">{money(v.net_amount)}</td><td>{v.payment_method||'-'}</td>
+        <td><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?printCheque(v):printVoucher(v)}>พิมพ์</button></td></tr>)}</tbody>
+    </table></div>
+    {showCreate&&<PaymentVoucherModal project={project} expenses={expenses} vendors={vendors} vouchers={vouchers} onClose={()=>setShowCreate(false)} onSaved={async()=>{setShowCreate(false);await load();await onUpdated();}} />}
+  </section>;
+}
+
+
 function App() {
   const [projects, setProjects] = useState([]);
   const [costCodes, setCostCodes] = useState([]);
@@ -1147,6 +1323,9 @@ function App() {
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
         <button className={active === 'documents' ? 'active' : ''} onClick={() => setActive('documents')}>เอกสาร</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
+        <button className={active === 'wht' ? 'active' : ''} onClick={() => setActive('wht')}>หัก ณ ที่จ่าย</button>
+        <button className={active === 'voucher' ? 'active' : ''} onClick={() => setActive('voucher')}>ใบสำคัญจ่าย</button>
+        <button className={active === 'cheque' ? 'active' : ''} onClick={() => setActive('cheque')}>พิมพ์เช็ค</button>
         <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
         <button className={active === 'audit' ? 'active' : ''} onClick={() => setActive('audit')}>Audit Log</button>
       </nav>
@@ -1210,6 +1389,9 @@ function App() {
 
       {active === 'documents' && <DocumentPanel expenses={expenses} project={project} costCodes={costCodes} vendors={vendors} onUpdated={loadBase} />}
 
+      {active === 'wht' && <PaymentDocumentsPanel mode="wht" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
+      {active === 'voucher' && <PaymentDocumentsPanel mode="voucher" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
+      {active === 'cheque' && <PaymentDocumentsPanel mode="cheque" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
       {active === 'reports' && <ReportPanel project={project} expenses={expenses} costCodes={costCodes} vendors={vendors} />}
       {active === 'audit' && <AuditPanel />}
 
