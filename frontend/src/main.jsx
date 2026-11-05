@@ -1455,10 +1455,13 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 
   const expenseMeta = useMemo(() => Object.fromEntries(expenses.map((e) => {
     const prior = allocationsByExpense[e.id] || [];
-    const paidGross = prior.reduce((sum,a)=>sum + Number(a.gross_amount||0),0);
-    const paidWht = prior.reduce((sum,a)=>sum + Number(a.withholding_tax||0),0);
+    const allocatedGross = prior.reduce((sum,a)=>sum + Number(a.gross_amount||0),0);
+    const allocatedWht = prior.reduce((sum,a)=>sum + Number(a.withholding_tax||0),0);
     const total = Number(e.total_amount||0);
     const subtotal = Number(e.subtotal||0);
+    const manualGross = prior.length ? 0 : Math.min(total, Number(e.net_paid||0) + Number(e.withholding_tax||0));
+    const paidGross = Math.max(allocatedGross, manualGross);
+    const paidWht = prior.length ? allocatedWht : Number(e.withholding_tax||0);
     const remaining = Math.max(total-paidGross,0);
     const priorTaxBase = prior.reduce((sum,a)=>sum + (total ? Number(a.gross_amount||0) * subtotal / total : Number(a.gross_amount||0)),0);
     const inferredRate = priorTaxBase > 0
