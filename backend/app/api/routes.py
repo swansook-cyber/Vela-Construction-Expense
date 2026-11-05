@@ -397,6 +397,7 @@ def dashboard(project_id: int, db: Session = Depends(get_db)):
 
     total = sum((Decimal(e.total_amount or 0) for e in expenses), Decimal("0"))
     paid = sum((Decimal(e.net_paid or 0) for e in expenses), Decimal("0"))
+    withholding = sum((Decimal(e.withholding_tax or 0) for e in expenses), Decimal("0"))
     vendor_payable = sum(
         (
             max(
@@ -415,6 +416,7 @@ def dashboard(project_id: int, db: Session = Depends(get_db)):
         project_name=project.name,
         total_expenses=total,
         paid_amount=paid,
+        withholding_tax=withholding,
         outstanding_amount=outstanding,
         expense_count=len(expenses),
         unpaid_count=unpaid_count,
