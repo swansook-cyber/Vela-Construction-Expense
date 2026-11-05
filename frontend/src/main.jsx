@@ -103,7 +103,8 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
     setError('');
     setSaving(true);
     try {
-      const netPaid = form.payment_status === 'PAID' ? vendorPayable : 0;
+      const actualWht = form.payment_status === 'PAID' ? wht : 0;
+      const netPaid = form.payment_status === 'PAID' ? Math.max(total - actualWht, 0) : 0;
       await api('/expenses', {
         method: 'POST',
         body: JSON.stringify({
@@ -115,7 +116,8 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
           description: form.description,
           subtotal: subtotal.toFixed(2),
           vat_amount: vat.toFixed(2),
-          withholding_tax: wht.toFixed(2),
+          withholding_tax: actualWht.toFixed(2),
+          default_wht_rate: Number(form.whtRate || 0).toFixed(2),
           total_amount: total.toFixed(2),
           net_paid: netPaid.toFixed(2),
           payment_status: form.payment_status,
@@ -184,13 +186,13 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
             </select>
           </label>
           <label>สถานะการจ่าย
-            <select value={form.payment_status} onChange={(e) => set('payment_status', e.target.value)}>
+            <select value={form.payment_status} onChange={(e) => set('payment_status', e.target.value)} disabled={paymentLocked}>
               <option value="UNPAID">ยังไม่จ่าย</option>
               <option value="PAID">จ่ายแล้ว</option>
             </select>
           </label>
           <label>วิธีจ่าย
-            <select value={form.payment_method} onChange={(e) => set('payment_method', e.target.value)}>
+            <select value={form.payment_method} onChange={(e) => set('payment_method', e.target.value)} disabled={paymentLocked}>
               <option value="">ไม่ระบุ</option>
               <option value="TRANSFER">โอน</option>
               <option value="CASH">เงินสด</option>
@@ -202,7 +204,7 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
           <div className="calc wide quick-summary">
             <span>ก่อน VAT <b>{money(subtotal)}</b></span>
             <span>VAT <b>{money(vat)}</b></span>
-            <span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span>
+            <span>{form.payment_status==='PAID'?'หัก ณ ที่จ่าย':'WHT เมื่อจ่าย'} <b>-{money(wht)}</b></span>
             <span className="total-line">ยอดเอกสาร <b>{money(total)}</b></span>
             <span>จ่ายผู้ขายสุทธิ <b>{money(vendorPayable)}</b></span>
           </div>
@@ -225,7 +227,9 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
 function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, onSaved }) {
   const existingSubtotal = Number(existing?.subtotal || 0);
   const existingVatRate = existingSubtotal > 0 ? String(Math.round(Number(existing?.vat_amount || 0) / existingSubtotal * 100)) : '7';
-  const existingWhtRate = existingSubtotal > 0 ? String(Math.round(Number(existing?.withholding_tax || 0) / existingSubtotal * 100)) : '0';
+  const existingWhtRate = existing?.default_wht_rate != null
+    ? String(Number(existing.default_wht_rate))
+    : (existingSubtotal > 0 ? String(Math.round(Number(existing?.withholding_tax || 0) / existingSubtotal * 100)) : '0');
   const [form, setForm] = useState({
     project_id: existing?.project_id || projects[0]?.id || '',
     cost_code_id: existing?.cost_code_id || '',
@@ -243,6 +247,7 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const paymentLocked = !!existing && Number(existing.net_paid || 0) > 0;
 
   const subtotal = Number(form.subtotal || 0);
   const vat = subtotal * Number(form.vatRate || 0) / 100;
@@ -257,9 +262,20 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
     setError('');
     setSaving(true);
     try {
-      let netPaid = Number(form.paid_amount || 0);
-      if (form.payment_status === 'PAID') netPaid = vendorPayable;
-      if (form.payment_status === 'UNPAID') netPaid = 0;
+      let actualWht = paymentLocked ? Number(existing.withholding_tax || 0) : 0;
+      let netPaid = paymentLocked ? Number(existing.net_paid || 0) : Number(form.paid_amount || 0);
+      let paymentStatus = paymentLocked ? existing.payment_status : form.payment_status;
+      let paymentMethod = paymentLocked ? existing.payment_method : form.payment_method;
+
+      if (!paymentLocked) {
+        if (paymentStatus === 'PAID') {
+          actualWht = wht;
+          netPaid = Math.max(total - actualWht, 0);
+        } else if (paymentStatus === 'UNPAID') {
+          actualWht = 0;
+          netPaid = 0;
+        }
+      }
 
       await api(existing ? `/expenses/${existing.id}` : '/expenses', {
         method: existing ? 'PUT' : 'POST',
@@ -272,11 +288,12 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
           description: form.description,
           subtotal: subtotal.toFixed(2),
           vat_amount: vat.toFixed(2),
-          withholding_tax: wht.toFixed(2),
+          withholding_tax: actualWht.toFixed(2),
+          default_wht_rate: Number(form.whtRate || 0).toFixed(2),
           total_amount: total.toFixed(2),
           net_paid: netPaid.toFixed(2),
-          payment_status: form.payment_status,
-          payment_method: form.payment_method || null,
+          payment_status: paymentStatus,
+          payment_method: paymentMethod || null,
           notes: form.notes || null,
           paperless_document_id: existing?.paperless_document_id || null,
         }),
@@ -369,7 +386,8 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
               <option value="CHEQUE">เช็ค</option>
             </select>
           </label>
-          {form.payment_status === 'PARTIAL' && (
+          {paymentLocked && <div className="info-message wide">รายการนี้มีประวัติการจ่ายแล้ว ยอดจ่าย/WHT/สถานะจะคำนวณจากใบสำคัญจ่าย ไม่แก้จากหน้านี้</div>}
+          {!paymentLocked && form.payment_status === 'PARTIAL' && (
             <label>จ่ายแล้ว
               <input type="number" min="0" step="0.01" max={vendorPayable} value={form.paid_amount} onChange={(e) => set('paid_amount', e.target.value)} required />
             </label>
@@ -1438,7 +1456,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
     const priorTaxBase = prior.reduce((sum,a)=>sum + (total ? Number(a.gross_amount||0) * subtotal / total : Number(a.gross_amount||0)),0);
     const inferredRate = priorTaxBase > 0
       ? paidWht / priorTaxBase * 100
-      : (subtotal > 0 && Number(e.withholding_tax||0) > 0 ? Number(e.withholding_tax||0) / subtotal * 100 : 0);
+      : (e.default_wht_rate != null ? Number(e.default_wht_rate) : (subtotal > 0 && Number(e.withholding_tax||0) > 0 ? Number(e.withholding_tax||0) / subtotal * 100 : 0));
     return [e.id,{paidGross,paidWht,remaining,inferredRate}];
   })), [expenses,allocationsByExpense]);
 
