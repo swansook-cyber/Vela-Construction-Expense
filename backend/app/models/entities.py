@@ -126,6 +126,10 @@ class PaymentVoucher(Base):
             return [item.expense_id for item in self.items]
         return [self.expense_id] if self.expense_id is not None else []
 
+    @property
+    def allocations(self):
+        return self.items
+
 
 class PaymentVoucherItem(Base):
     __tablename__ = "payment_voucher_items"
