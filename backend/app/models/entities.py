@@ -46,6 +46,7 @@ class Vendor(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), index=True)
+    cheque_payee_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     entity_type: Mapped[str] = mapped_column(String(30), default="UNKNOWN")
     tax_id: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
