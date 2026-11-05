@@ -1469,7 +1469,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           gross_amount: gross.toFixed(2),
           withholding_tax: wht.toFixed(2),
           wht_rate: null,
-          income_type: selectedExpenses.length > 1 ? 'รวมตามบิล/ใบวางบิล' : null,
+          income_type: null,
           net_amount: net.toFixed(2),
           payment_method: form.payment_method || null,
           payee_name: form.payee_name,
