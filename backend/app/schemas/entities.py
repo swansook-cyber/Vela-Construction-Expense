@@ -154,3 +154,11 @@ class PaymentVoucherOut(PaymentVoucherCreate):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class PaymentVoucherPaymentUpdate(BaseModel):
+    payment_method: str
+    cheque_no: str | None = None
+    cheque_date: date | None = None
+    bank_name: str | None = None
+    notes: str | None = None
