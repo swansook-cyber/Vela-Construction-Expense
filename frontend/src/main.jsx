@@ -1065,12 +1065,11 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
   return (
     <section className="panel report-panel">
       <div className="report-screen-head no-print">
-        <div><h2>รายงานค่าใช้จ่าย</h2><p>เลือกเดือนและตัวกรอง แล้วปริ้นหรือบันทึกเป็น PDF ได้</p></div>
+        <div><h2>รายงานค่าใช้จ่าย</h2><p>กรองข้อมูล ตรวจยอด และส่งต่อสำนักงานบัญชี</p></div>
         <div className="report-actions">
-          <button className="ghost" onClick={exportFilteredCsv}>Export CSV</button>
-          <button className="ghost" onClick={exportAccountingCsv}>ส่งสำนักงานบัญชี CSV</button>
-          <button className="ghost" onClick={exportAccountingXlsx}>ส่งสำนักงานบัญชี Excel</button>
-          <button onClick={() => window.print()}>Print / PDF</button>
+          <button className="report-primary" onClick={exportAccountingXlsx}>Excel สำหรับสำนักงานบัญชี</button>
+          <button className="ghost" onClick={() => window.print()}>พิมพ์ / PDF</button>
+          <details className="export-menu"><summary>ส่งออกอื่น ๆ</summary><div className="export-menu-popover"><button onClick={exportFilteredCsv}>รายงาน CSV</button><button onClick={exportAccountingCsv}>สำนักงานบัญชี CSV</button></div></details>
         </div>
       </div>
 
@@ -1807,6 +1806,7 @@ function App() {
   const [expenseStatus, setExpenseStatus] = useState('');
   const [expensePage, setExpensePage] = useState(1);
   const [expensePageSize, setExpensePageSize] = useState(25);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const project = projects[0];
 
@@ -1872,6 +1872,12 @@ function App() {
     const start = (currentExpensePage - 1) * expensePageSize;
     return filteredExpenses.slice(start, start + expensePageSize);
   }, [filteredExpenses, currentExpensePage, expensePageSize]);
+  const activeExpenseFilters = [
+    expenseMonth && { label: `เดือน ${expenseMonth}`, clear: () => setExpenseMonth('') },
+    expenseCostCode && { label: `หมวด ${costCodes.find((c) => String(c.id) === String(expenseCostCode))?.code || expenseCostCode}`, clear: () => setExpenseCostCode('') },
+    expenseVendor && { label: vendorMap[expenseVendor] || 'ผู้ขาย', clear: () => setExpenseVendor('') },
+    expenseStatus && { label: ({ PAID: 'จ่ายแล้ว', UNPAID: 'ยังไม่จ่าย', PARTIAL: 'บางส่วน', VOID: 'ยกเลิก' })[expenseStatus], clear: () => setExpenseStatus('') },
+  ].filter(Boolean);
 
   useEffect(() => { setExpensePage(1); }, [expenseSearch, expenseMonth, expenseCostCode, expenseVendor, expenseStatus, expensePageSize]);
 
@@ -1902,7 +1908,7 @@ function App() {
         {cards.map(([label, value], index) => <article className="metric-card" key={label}><div className="metric-icon">{['฿','✓','%','◷'][index]}</div><div><span>{label}</span><strong>{value}</strong></div></article>)}
       </section>
 
-      <nav className="tabs app-nav">
+      <nav className="tabs app-nav" aria-label="เมนูหลัก">
         <button className={active === 'expenses' ? 'active' : ''} onClick={() => setActive('expenses')}>ค่าใช้จ่าย</button>
         <button className={active === 'vendors' ? 'active' : ''} onClick={() => setActive('vendors')}>ผู้ขาย / ผู้รับเหมา</button>
         <button className={active === 'codes' ? 'active' : ''} onClick={() => setActive('codes')}>Cost Codes</button>
@@ -1910,21 +1916,20 @@ function App() {
         <button className={active === 'voucher' ? 'active' : ''} onClick={() => setActive('voucher')}>ใบสำคัญจ่าย</button>
         <button className={active === 'cheque' ? 'active' : ''} onClick={() => setActive('cheque')}>พิมพ์เช็ค</button>
         <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
-        <button className={active === 'settings' ? 'active' : ''} onClick={() => setActive('settings')}>ตั้งค่าบริษัท</button>
-        <button className={active === 'audit' ? 'active' : ''} onClick={() => setActive('audit')}>Audit Log</button>
+        <div className="nav-more"><button className={active === 'settings' || active === 'audit' ? 'active' : ''} aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>เพิ่มเติม ▾</button>{moreOpen && <div className="nav-more-menu"><button onClick={() => { setActive('settings'); setMoreOpen(false); }}>ตั้งค่าบริษัท</button><button onClick={() => { setActive('audit'); setMoreOpen(false); }}>Audit Log</button></div>}</div>
       </nav>
 
       {active === 'expenses' && (
         <section className="panel expense-panel">
           <div className="section-head">
-            <div><h2>รายการค่าใช้จ่าย</h2><p>แสดง {filteredExpenses.length} จาก {expenses.length} รายการ</p></div>
-            <button onClick={() => setShowExpense(true)}>+ เพิ่มรายการ</button>
+            <div><p className="section-kicker">ทะเบียนค่าใช้จ่าย</p><h2>รายการค่าใช้จ่าย</h2><p>แสดง {filteredExpenses.length} จาก {expenses.length} รายการ</p></div>
+            <button className="section-add" onClick={() => setShowExpense(true)}>+ เพิ่มรายการ</button>
           </div>
 
           <div className="expense-toolbar">
             <div className="search-box">
               <span>⌕</span>
-              <input value={expenseSearch} onChange={(e)=>setExpenseSearch(e.target.value)} placeholder="ค้นหาเลขรายการ เอกสาร รายละเอียด หรือผู้ขาย..." />
+              <input aria-label="ค้นหาค่าใช้จ่าย" value={expenseSearch} onChange={(e)=>setExpenseSearch(e.target.value)} placeholder="ค้นหาเลขรายการ เอกสาร รายละเอียด ผู้ขาย หรือ Cost Code" />
             </div>
             <select value={expenseMonth} onChange={(e)=>setExpenseMonth(e.target.value)}>
               <option value="">ทุกเดือน</option>
@@ -1947,17 +1952,18 @@ function App() {
             </select>
             <button className="ghost filter-reset" onClick={()=>{setExpenseSearch('');setExpenseMonth('');setExpenseCostCode('');setExpenseVendor('');setExpenseStatus('')}}>ล้าง</button>
           </div>
+          {(activeExpenseFilters.length > 0 || expenseSearch) && <div className="active-filters"><span>กำลังกรอง</span>{expenseSearch && <button onClick={() => setExpenseSearch('')}>ค้นหา: {expenseSearch} ×</button>}{activeExpenseFilters.map((filter) => <button key={filter.label} onClick={filter.clear}>{filter.label} ×</button>)}</div>}
 
           <div className="table-wrap expense-table-wrap">
             <table className="expense-table">
               <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ยอด</th><th>เอกสาร</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
               <tbody>
-                {pagedExpenses.length === 0 && <tr><td colSpan="9" className="empty">ไม่พบรายการตามเงื่อนไขที่เลือก</td></tr>}
+                {pagedExpenses.length === 0 && <tr className="empty-row"><td colSpan="9" className="empty"><div className="empty-state"><strong>{expenses.length ? 'ไม่พบรายการที่ตรงกับตัวกรอง' : 'ยังไม่มีค่าใช้จ่าย'}</strong><span>{expenses.length ? 'ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง' : 'เริ่มจากบันทึกค่าใช้จ่ายรายการแรกของโครงการ'}</span>{expenses.length ? <button className="ghost mini" onClick={() => { setExpenseSearch(''); setExpenseMonth(''); setExpenseCostCode(''); setExpenseVendor(''); setExpenseStatus(''); }}>ล้างตัวกรอง</button> : <button className="mini" onClick={() => setShowExpense(true)}>+ เพิ่มรายการ</button>}</div></td></tr>}
                 {pagedExpenses.map((e) => (
                   <tr key={e.id}>
                     <td data-label="วันที่">{thaiDate(e.expense_date)}</td>
-                    <td data-label="เลขรายการ" className="mono">{e.expense_no}</td>
-                    <td data-label="รายละเอียด" className="expense-desc">{e.description}</td>
+                    <td data-label="เลขรายการ" className="mono">{e.expense_no}<small className="expense-doc-no">{e.document_no || ''}</small></td>
+                    <td data-label="รายละเอียด"><span className="expense-desc">{e.description}</span></td>
                     <td data-label="หมวดงาน">{costMap[e.cost_code_id] || '-'}</td>
                     <td data-label="ผู้ขาย">{vendorMap[e.vendor_id] || '-'}</td>
                     <td data-label="ยอด" className="amount">{money(e.total_amount)}</td>
@@ -1965,9 +1971,9 @@ function App() {
                     <td data-label="สถานะ"><span className={`status ${e.payment_status.toLowerCase()}`}>{({UNPAID:'ยังไม่จ่าย',PARTIAL:'บางส่วน',PAID:'จ่ายแล้ว',VOID:'ยกเลิก'})[e.payment_status]}</span></td>
                     <td data-label="จัดการ">
                       <div className="row-actions">
-                        <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}>แก้ไข</button>
-                        <button className="mini ghost" disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}>{e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}</button>
-                        <button className="mini danger" disabled={e.payment_status === 'VOID'} onClick={() => voidExpense(e)}>ยกเลิก</button>
+                        <button className="mini ghost" title="แก้ไข" aria-label={`แก้ไข ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}><span aria-hidden="true">✎</span><span className="action-label">แก้ไข</span></button>
+                        <button className="mini ghost" title={e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'} aria-label={`${e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'} ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}><span aria-hidden="true">▣</span><span className="action-label">{e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}</span></button>
+                        <button className="mini danger" title="ยกเลิก" aria-label={`ยกเลิก ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => voidExpense(e)}><span aria-hidden="true">×</span><span className="action-label">ยกเลิก</span></button>
                       </div>
                     </td>
                   </tr>
