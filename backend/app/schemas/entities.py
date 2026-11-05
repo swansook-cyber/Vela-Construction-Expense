@@ -131,7 +131,8 @@ class AuditLogOut(BaseModel):
 
 class PaymentVoucherCreate(BaseModel):
     project_id: int
-    expense_id: int
+    expense_id: int | None = None
+    expense_ids: list[int] = Field(default_factory=list)
     vendor_id: int | None = None
     voucher_date: date
     gross_amount: Decimal
