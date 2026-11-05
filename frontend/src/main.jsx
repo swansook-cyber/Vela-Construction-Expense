@@ -1296,9 +1296,9 @@ function App() {
 
   const cards = [
     ['ต้นทุนตามเอกสาร', money(summary?.total_expenses)],
-    ['จ่ายแล้ว', money(summary?.paid_amount)],
-    ['ยอดรอจ่าย', money(summary?.outstanding_amount)],
-    ['รายการค้าง', summary ? `${summary.unpaid_count} รายการ` : '—'],
+    ['จ่ายผู้ขายสุทธิ', money(summary?.paid_amount)],
+    ['หัก ณ ที่จ่าย', money(summary?.withholding_tax)],
+    ['ยอดค้างผู้ขาย', money(summary?.outstanding_amount)],
   ];
 
   return (
