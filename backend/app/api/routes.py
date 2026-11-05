@@ -27,6 +27,7 @@ from app.schemas.entities import (
     ExpenseVoid,
     PaymentVoucherCreate,
     PaymentVoucherOut,
+    PaymentVoucherPaymentUpdate,
     ProjectOut,
     VendorCreate,
     VendorOut,
@@ -405,6 +406,31 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
             "cheque_no": voucher.cheque_no,
         },
     )
+    db.commit()
+    db.refresh(voucher)
+    return voucher
+
+
+@router.put("/payment-vouchers/{voucher_id}/payment", response_model=PaymentVoucherOut)
+def update_payment_voucher_payment(voucher_id: int, payload: PaymentVoucherPaymentUpdate, db: Session = Depends(get_db)):
+    voucher = db.get(PaymentVoucher, voucher_id)
+    if not voucher:
+        raise HTTPException(status_code=404, detail="Payment voucher not found")
+    if payload.payment_method == "CHEQUE" and (not payload.bank_name or not payload.cheque_no or not payload.cheque_date):
+        raise HTTPException(status_code=400, detail="Cheque payment requires bank name, cheque number and cheque date")
+
+    voucher.payment_method = payload.payment_method
+    voucher.cheque_no = payload.cheque_no if payload.payment_method == "CHEQUE" else None
+    voucher.cheque_date = payload.cheque_date if payload.payment_method == "CHEQUE" else None
+    voucher.bank_name = payload.bank_name if payload.payment_method == "CHEQUE" else None
+    voucher.notes = payload.notes
+    voucher.updated_at = datetime.utcnow()
+    add_audit(db, "payment_voucher", voucher.id, "UPDATE_PAYMENT", {
+        "payment_method": voucher.payment_method,
+        "cheque_no": voucher.cheque_no,
+        "cheque_date": voucher.cheque_date,
+        "bank_name": voucher.bank_name,
+    })
     db.commit()
     db.refresh(voucher)
     return voucher
