@@ -344,8 +344,15 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
   );
 }
 
-function VendorModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', tax_id: '', phone: '', address: '', notes: '' });
+function VendorModal({ existing, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: existing?.name || '',
+    entity_type: existing?.entity_type || 'UNKNOWN',
+    tax_id: existing?.tax_id || '',
+    phone: existing?.phone || '',
+    address: existing?.address || '',
+    notes: existing?.notes || ''
+  });
   const [error, setError] = useState('');
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -353,8 +360,8 @@ function VendorModal({ onClose, onSaved }) {
     e.preventDefault();
     setError('');
     try {
-      await api('/vendors', {
-        method: 'POST',
+      await api(existing ? `/vendors/${existing.id}` : '/vendors', {
+        method: existing ? 'PUT' : 'POST',
         body: JSON.stringify({
           ...form,
           tax_id: form.tax_id || null,
@@ -373,12 +380,19 @@ function VendorModal({ onClose, onSaved }) {
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal small" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <div><p className="eyebrow">Vendor</p><h2>เพิ่มผู้ขาย / ผู้รับเหมา</h2></div>
+          <div><p className="eyebrow">Vendor</p><h2>{existing ? 'แก้ไขผู้ขาย / ผู้รับเหมา' : 'เพิ่มผู้ขาย / ผู้รับเหมา'}</h2></div>
           <button className="ghost icon" onClick={onClose}>×</button>
         </div>
         <form onSubmit={submit} className="form-grid">
           <label className="wide">ชื่อ
             <input value={form.name} onChange={(e) => set('name', e.target.value)} required autoFocus />
+          </label>
+          <label>ประเภทผู้รับเงิน
+            <select value={form.entity_type} onChange={(e) => set('entity_type', e.target.value)}>
+              <option value="UNKNOWN">ยังไม่ระบุ</option>
+              <option value="INDIVIDUAL">บุคคลธรรมดา</option>
+              <option value="JURISTIC">นิติบุคคล</option>
+            </select>
           </label>
           <label>เลขประจำตัวผู้เสียภาษี
             <input value={form.tax_id} onChange={(e) => set('tax_id', e.target.value)} />
@@ -392,7 +406,7 @@ function VendorModal({ onClose, onSaved }) {
           {error && <div className="error wide">{error}</div>}
           <div className="actions wide">
             <button type="button" className="ghost" onClick={onClose}>ยกเลิก</button>
-            <button type="submit">บันทึกผู้ขาย</button>
+            <button type="submit">{existing ? 'บันทึกการแก้ไข' : 'บันทึกผู้ขาย'}</button>
           </div>
         </form>
       </div>
@@ -1271,10 +1285,10 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         <span>☐ (1) ภ.ง.ด.1ก</span>
         <span>☐ (2) ภ.ง.ด.1ก พิเศษ</span>
         <span>☐ (3) ภ.ง.ด.2</span>
-        <span>☐ (4) ภ.ง.ด.3</span>
+        <span>${vendor?.entity_type==='INDIVIDUAL'?'☑':'☐'} (4) ภ.ง.ด.3</span>
         <span>☐ (5) ภ.ง.ด.2ก</span>
         <span>☐ (6) ภ.ง.ด.3ก</span>
-        <span>☑ (7) ภ.ง.ด.53</span>
+        <span>${vendor?.entity_type==='JURISTIC'?'☑':'☐'} (7) ภ.ง.ด.53</span>
       </div>
 
       <table class="wht-table">
@@ -1315,6 +1329,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         <span>☐ (4) อื่น ๆ (ระบุ) ............................</span>
       </div>
 
+      ${vendor?.entity_type==='UNKNOWN' ? '<div class="wht-warning"><b>ข้อมูลไม่ครบ:</b> กรุณาระบุประเภทผู้รับเงินว่าเป็นบุคคลธรรมดาหรือนิติบุคคล เพื่อเลือก ภ.ง.ด.3 / ภ.ง.ด.53 ให้ถูกต้อง</div>' : ''}
       <div class="wht-warning"><b>คำเตือน</b> ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ต้องปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
       <div class="wht-certify">ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
 
@@ -1425,6 +1440,7 @@ function App() {
   const [summary, setSummary] = useState(null);
   const [showExpense, setShowExpense] = useState(false);
   const [showVendor, setShowVendor] = useState(false);
+  const [editingVendor, setEditingVendor] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
   const [attachingExpense, setAttachingExpense] = useState(null);
   const [active, setActive] = useState('expenses');
@@ -1554,8 +1570,10 @@ function App() {
             {vendors.map((v) => (
               <div className="vendor-card" key={v.id}>
                 <strong>{v.name}</strong>
+                <span>{v.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : v.entity_type === 'JURISTIC' ? 'นิติบุคคล' : 'ยังไม่ระบุประเภทผู้รับเงิน'}</span>
                 <span>{v.tax_id ? `Tax ID: ${v.tax_id}` : 'ไม่ระบุเลขภาษี'}</span>
                 <span>{v.phone || ''}</span>
+                <button className="mini ghost" onClick={() => setEditingVendor(v)}>แก้ไข</button>
               </div>
             ))}
           </div>
@@ -1612,6 +1630,13 @@ function App() {
         <VendorModal
           onClose={() => setShowVendor(false)}
           onSaved={async () => { setShowVendor(false); await loadBase(); }}
+        />
+      )}
+      {editingVendor && (
+        <VendorModal
+          existing={editingVendor}
+          onClose={() => setEditingVendor(null)}
+          onSaved={async () => { setEditingVendor(null); await loadBase(); }}
         />
       )}
     </main>
