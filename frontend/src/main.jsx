@@ -854,9 +854,16 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
   const [vendorId, setVendorId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [view, setView] = useState('DETAIL');
+  const [vouchers, setVouchers] = useState([]);
+
+  useEffect(() => {
+    if (!project?.id) return;
+    api(`/payment-vouchers?project_id=${project.id}`).then(setVouchers).catch(() => setVouchers([]));
+  }, [project?.id]);
 
   const costMap = useMemo(() => Object.fromEntries(costCodes.map((c) => [c.id, c])), [costCodes]);
   const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v])), [vendors]);
+  const voucherByExpense = useMemo(() => Object.fromEntries(vouchers.map((v) => [v.expense_id, v])), [vouchers]);
 
   const filtered = useMemo(() => expenses.filter((e) => {
     if (e.payment_status === 'VOID') return false;
@@ -939,12 +946,59 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     URL.revokeObjectURL(url);
   }
 
+  function exportAccountingCsv() {
+    const header = [
+      'วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code',
+      'ผู้ขาย/ผู้รับเหมา','เลขประจำตัวผู้เสียภาษี','ประเภทผู้รับเงิน',
+      'ก่อน VAT','VAT','ยอดเอกสาร','WHT','จ่ายสุทธิ','สถานะ',
+      'วิธีจ่าย','เลขที่ใบสำคัญจ่าย','เลขที่ 50 ทวิ','ธนาคาร','เลขที่เช็ค','วันที่เช็ค','หมายเหตุ'
+    ];
+    const rows = filtered.map((e) => {
+      const code = costMap[e.cost_code_id];
+      const vendor = vendorMap[e.vendor_id];
+      const voucher = voucherByExpense[e.id];
+      return [
+        thaiDate(e.expense_date),
+        e.expense_no,
+        e.document_no || '',
+        e.description,
+        code ? `${code.code} ${code.name}` : '',
+        vendor?.name || '',
+        vendor?.tax_id || '',
+        vendor?.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : vendor?.entity_type === 'JURISTIC' ? 'นิติบุคคล' : '',
+        e.subtotal,
+        e.vat_amount,
+        e.total_amount,
+        e.withholding_tax,
+        voucher?.net_amount ?? e.net_paid ?? '',
+        e.payment_status,
+        voucher?.payment_method || e.payment_method || '',
+        voucher?.voucher_no || '',
+        voucher?.wht_certificate_no || '',
+        voucher?.bank_name || '',
+        voucher?.cheque_no || '',
+        voucher?.cheque_date ? thaiDate(voucher.cheque_date) : '',
+        voucher?.notes || e.notes || ''
+      ];
+    });
+    const esc = (v) => '"' + String(v ?? '').replaceAll('"', '""') + '"';
+    const csv = '\ufeff' + [header, ...rows].map((row) => row.map(esc).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project?.code || 'sea-mountain'}-${month || 'all'}-accounting.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section className="panel report-panel">
       <div className="report-screen-head no-print">
         <div><h2>รายงานค่าใช้จ่าย</h2><p>เลือกเดือนและตัวกรอง แล้วปริ้นหรือบันทึกเป็น PDF ได้</p></div>
         <div className="report-actions">
           <button className="ghost" onClick={exportFilteredCsv}>Export CSV</button>
+          <button className="ghost" onClick={exportAccountingCsv}>ส่งสำนักงานบัญชี CSV</button>
           <button onClick={() => window.print()}>Print / PDF</button>
         </div>
       </div>
