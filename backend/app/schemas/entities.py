@@ -11,6 +11,20 @@ class ProjectOut(BaseModel):
     status: str
 
 
+class CompanyProfileUpdate(BaseModel):
+    legal_name: str = Field(min_length=1, max_length=255)
+    tax_id: str | None = None
+    address: str | None = None
+    branch: str | None = None
+    phone: str | None = None
+
+
+class CompanyProfileOut(CompanyProfileUpdate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    updated_at: datetime
+
+
 class CostCodeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -120,6 +134,8 @@ class PaymentVoucherCreate(BaseModel):
     voucher_date: date
     gross_amount: Decimal
     withholding_tax: Decimal = Decimal("0")
+    wht_rate: Decimal | None = None
+    income_type: str | None = None
     net_amount: Decimal
     payment_method: str | None = None
     payee_name: str = Field(min_length=1, max_length=255)
