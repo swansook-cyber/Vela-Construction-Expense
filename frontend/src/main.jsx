@@ -1211,10 +1211,58 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
   </div>;
 }
 
+
+function PaymentEditModal({ voucher, onClose, onSaved }) {
+  const [form,setForm]=useState({
+    payment_method:voucher.payment_method||'TRANSFER',
+    bank_name:voucher.bank_name||'',
+    cheque_no:voucher.cheque_no||'',
+    cheque_date:voucher.cheque_date||today(),
+    notes:voucher.notes||''
+  });
+  const [error,setError]=useState('');
+  const set=(k,v)=>setForm((x)=>({...x,[k]:v}));
+  async function submit(e){
+    e.preventDefault(); setError('');
+    try{
+      await api(`/payment-vouchers/${voucher.id}/payment`,{
+        method:'PUT',
+        body:JSON.stringify({
+          payment_method:form.payment_method,
+          bank_name:form.payment_method==='CHEQUE'?(form.bank_name||null):null,
+          cheque_no:form.payment_method==='CHEQUE'?(form.cheque_no||null):null,
+          cheque_date:form.payment_method==='CHEQUE'?form.cheque_date:null,
+          notes:form.notes||null
+        })
+      });
+      await onSaved();
+    }catch(err){setError(err.message);}
+  }
+  return <div className="modal-backdrop" onMouseDown={onClose}>
+    <div className="modal small" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="modal-head"><div><p className="eyebrow">Payment</p><h2>แก้ไขข้อมูลการจ่าย</h2><p>{voucher.voucher_no}</p></div><button className="ghost icon" onClick={onClose}>×</button></div>
+      <form className="form-grid" onSubmit={submit}>
+        <label>วิธีจ่าย<select value={form.payment_method} onChange={(e)=>set('payment_method',e.target.value)}>
+          <option value="TRANSFER">โอน</option><option value="CASH">เงินสด</option><option value="CHEQUE">เช็ค</option>
+        </select></label>
+        {form.payment_method==='CHEQUE' && <>
+          <label>ธนาคาร<input value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} required /></label>
+          <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} required /></label>
+          <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
+        </>}
+        <label className="wide">หมายเหตุ<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} /></label>
+        {error&&<div className="error wide">{error}</div>}
+        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button>บันทึกการจ่าย</button></div>
+      </form>
+    </div>
+  </div>;
+}
+
 function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) {
   const [vouchers,setVouchers]=useState([]);
   const [company,setCompany]=useState(null);
   const [showCreate,setShowCreate]=useState(false);
+  const [editingPayment,setEditingPayment]=useState(null);
   const expenseMap=useMemo(()=>Object.fromEntries(expenses.map((e)=>[e.id,e])),[expenses]);
 
   async function load() {
@@ -1436,9 +1484,10 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <tbody>{rows.length===0&&<tr><td colSpan="8" className="empty">ยังไม่มีรายการ</td></tr>}
       {rows.map((v)=><tr key={v.id}><td className="mono">{mode==='wht'?(v.wht_certificate_no||'-'):mode==='cheque'?(v.cheque_no||'-'):v.voucher_no}</td>
         <td>{thaiDate(v.voucher_date)}</td><td>{v.payee_name}</td><td className="amount">{money(v.gross_amount)}</td><td className="amount">{money(v.withholding_tax)}</td><td className="amount">{money(v.net_amount)}</td><td>{v.payment_method||'-'}</td>
-        <td><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?printCheque(v):printVoucher(v)}>พิมพ์</button></td></tr>)}</tbody>
+        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?printCheque(v):printVoucher(v)}>พิมพ์</button>{mode==='voucher'&&<button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button>}</div></td></tr>)}</tbody>
     </table></div>
     {showCreate&&<PaymentVoucherModal project={project} expenses={expenses} vendors={vendors} vouchers={vouchers} onClose={()=>setShowCreate(false)} onSaved={async()=>{setShowCreate(false);await load();await onUpdated();}} />}
+    {editingPayment&&<PaymentEditModal voucher={editingPayment} onClose={()=>setEditingPayment(null)} onSaved={async()=>{setEditingPayment(null);await load();await onUpdated();}} />}
   </section>;
 }
 
