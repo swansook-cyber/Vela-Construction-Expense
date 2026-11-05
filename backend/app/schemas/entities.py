@@ -35,6 +35,7 @@ class CostCodeOut(BaseModel):
 
 class VendorCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    entity_type: str = "UNKNOWN"
     tax_id: str | None = None
     phone: str | None = None
     address: str | None = None
