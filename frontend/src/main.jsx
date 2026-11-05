@@ -28,6 +28,50 @@ const thaiDate = (value) => {
   return new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(y, m - 1, d));
 };
 
+
+const thaiIntegerText = (value) => {
+  const n = Math.floor(Math.abs(Number(value || 0)));
+  if (n === 0) return 'ศูนย์';
+  if (n >= 1000000) {
+    const high = Math.floor(n / 1000000);
+    const low = n % 1000000;
+    return thaiIntegerText(high) + 'ล้าน' + (low ? thaiIntegerText(low) : '');
+  }
+
+  const digits = ['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+  const units = ['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+  const chars = String(n).split('').map(Number);
+  let out = '';
+
+  chars.forEach((digit, index) => {
+    if (digit === 0) return;
+    const pos = chars.length - index - 1;
+    if (pos === 1) {
+      if (digit === 1) out += 'สิบ';
+      else if (digit === 2) out += 'ยี่สิบ';
+      else out += digits[digit] + 'สิบ';
+      return;
+    }
+    if (pos === 0 && digit === 1 && chars.length > 1) {
+      out += 'เอ็ด';
+      return;
+    }
+    out += digits[digit] + units[pos];
+  });
+  return out;
+};
+
+const thaiBahtText = (value) => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return '';
+  const negative = amount < 0 ? 'ลบ' : '';
+  const satangTotal = Math.round(Math.abs(amount) * 100);
+  const baht = Math.floor(satangTotal / 100);
+  const satang = satangTotal % 100;
+  const bahtText = thaiIntegerText(baht) + 'บาท';
+  return negative + bahtText + (satang ? thaiIntegerText(satang) + 'สตางค์' : 'ถ้วน');
+};
+
 function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
   const [form, setForm] = useState({
     project_id: projects[0]?.id || '',
@@ -1519,7 +1563,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 
 function ChequePreviewModal({ voucher, onClose }) {
-  const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, accountPayeeX:12, accountPayeeY:10 };
+  const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
   const [cfg,setCfg]=useState(() => {
     try {
       const saved=JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}');
@@ -1538,6 +1582,7 @@ function ChequePreviewModal({ voucher, onClose }) {
   const set=(k,v)=>setCfg((x)=>({...x,[k]:Number(v)}));
   const date=thaiDate(voucher.cheque_date||voucher.voucher_date);
   const chequePayee=voucher.cheque_payee_name || voucher.payee_name;
+  const amountText=thaiBahtText(voucher.net_amount);
 
   function save(){
     localStorage.setItem('vela-cheque-layout',JSON.stringify(cfg));
@@ -1550,8 +1595,9 @@ function ChequePreviewModal({ voucher, onClose }) {
       @page{size:${cfg.width}mm ${cfg.height}mm;margin:0}
       body{margin:0;background:#fff}
       .cheque-print{position:relative;width:${cfg.width}mm;height:${cfg.height}mm;font-family:Arial,"Noto Sans Thai",sans-serif;color:#000}
-      .c-payee,.c-date,.c-amount,.c-account-payee{position:absolute;white-space:nowrap}
+      .c-payee,.c-date,.c-amount,.c-amount-text,.c-account-payee{position:absolute;white-space:nowrap}
       .c-payee{left:${cfg.payeeX}mm;top:${cfg.payeeY}mm;font-size:16px;font-weight:700}
+      .c-amount-text{left:${cfg.amountTextX}mm;top:${cfg.amountTextY}mm;font-size:${cfg.amountTextFontSize}px;font-weight:700}
       .c-account-payee{left:${cfg.accountPayeeX}mm;top:${cfg.accountPayeeY}mm;font-size:11px;font-weight:800;letter-spacing:.08em;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:1mm 5mm}
       .c-date{left:${cfg.dateX}mm;top:${cfg.dateY}mm;font-size:13px}
       .c-amount{left:${cfg.amountX}mm;top:${cfg.amountY}mm;font-size:16px;font-weight:700}
@@ -1561,6 +1607,7 @@ function ChequePreviewModal({ voucher, onClose }) {
       <div class="c-account-payee">A/C PAYEE ONLY</div>
       <div class="c-payee">${chequePayee}</div>
       <div class="c-date">${date}</div>
+      <div class="c-amount-text">${amountText}</div>
       <div class="c-amount">${money(voucher.net_amount)}</div>
     </div>`);
   }
@@ -1577,6 +1624,7 @@ function ChequePreviewModal({ voucher, onClose }) {
           <div style={{position:'absolute',left:`${cfg.accountPayeeX}mm`,top:`${cfg.accountPayeeY}mm`,fontWeight:800,fontSize:'11px',letterSpacing:'.08em',whiteSpace:'nowrap',borderTop:'1.5px solid #000',borderBottom:'1.5px solid #000',padding:'1mm 5mm'}}>A/C PAYEE ONLY</div>
           <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{chequePayee}</div>
           <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>
+          <div style={{position:'absolute',left:`${cfg.amountTextX}mm`,top:`${cfg.amountTextY}mm`,fontWeight:700,fontSize:`${cfg.amountTextFontSize}px`,whiteSpace:'nowrap'}}>{amountText}</div>
           <div style={{position:'absolute',left:`${cfg.amountX}mm`,top:`${cfg.amountY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{money(voucher.net_amount)}</div>
         </div>
       </div>
@@ -1597,6 +1645,9 @@ function ChequePreviewModal({ voucher, onClose }) {
           <label>วันที่ Y (mm)<input type="number" step="0.5" value={cfg.dateY} onChange={(e)=>set('dateY',e.target.value)} /></label>
           <label>จำนวนเงิน X (mm)<input type="number" step="0.5" value={cfg.amountX} onChange={(e)=>set('amountX',e.target.value)} /></label>
           <label>จำนวนเงิน Y (mm)<input type="number" step="0.5" value={cfg.amountY} onChange={(e)=>set('amountY',e.target.value)} /></label>
+          <label>จำนวนเงินตัวอักษร X (mm)<input type="number" step="0.5" value={cfg.amountTextX} onChange={(e)=>set('amountTextX',e.target.value)} /></label>
+          <label>จำนวนเงินตัวอักษร Y (mm)<input type="number" step="0.5" value={cfg.amountTextY} onChange={(e)=>set('amountTextY',e.target.value)} /></label>
+          <label>ขนาดตัวอักษรจำนวนเงิน (px)<input type="number" min="9" max="24" step="1" value={cfg.amountTextFontSize} onChange={(e)=>set('amountTextFontSize',e.target.value)} /></label>
           <label>A/C PAYEE X (mm)<input type="number" step="0.5" value={cfg.accountPayeeX} onChange={(e)=>set('accountPayeeX',e.target.value)} /></label>
           <label>A/C PAYEE Y (mm)<input type="number" step="0.5" value={cfg.accountPayeeY} onChange={(e)=>set('accountPayeeY',e.target.value)} /></label>
         </div>
