@@ -89,10 +89,7 @@ class Expense(Base):
 
 class PaymentVoucher(Base):
     __tablename__ = "payment_vouchers"
-    __table_args__ = (
-        UniqueConstraint("voucher_no", name="uq_payment_voucher_no"),
-        UniqueConstraint("expense_id", name="uq_payment_voucher_expense"),
-    )
+    __table_args__ = (UniqueConstraint("voucher_no", name="uq_payment_voucher_no"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     voucher_no: Mapped[str] = mapped_column(String(40), index=True)
