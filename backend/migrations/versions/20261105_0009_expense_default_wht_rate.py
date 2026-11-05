@@ -24,6 +24,12 @@ def upgrade() -> None:
               ELSE 0
             END
     """)
+    op.execute("""
+        UPDATE expenses
+        SET withholding_tax = 0
+        WHERE payment_status = 'UNPAID'
+          AND COALESCE(net_paid, 0) = 0
+    """)
 
 
 def downgrade() -> None:
