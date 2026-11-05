@@ -1004,28 +1004,29 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
       const code = costMap[e.cost_code_id];
       const vendor = vendorMap[e.vendor_id];
       const voucher = voucherByExpense[e.id];
+      const clean = (v) => String(v ?? '').trim();
       return [
         thaiDate(e.expense_date),
-        String(e.expense_no || ''),
-        String(e.document_no || ''),
-        e.description || '',
-        code ? `${code.code} ${code.name}` : '',
-        vendor?.name || '',
-        String(vendor?.tax_id || ''),
+        clean(e.expense_no),
+        clean(e.document_no),
+        clean(e.description),
+        code ? clean(`${code.code} ${code.name}`) : '',
+        clean(vendor?.name),
+        clean(vendor?.tax_id),
         vendor?.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : vendor?.entity_type === 'JURISTIC' ? 'นิติบุคคล' : '',
         Number(e.subtotal || 0),
         Number(e.vat_amount || 0),
         Number(e.total_amount || 0),
         Number(e.withholding_tax || 0),
         Number(voucher?.net_amount ?? e.net_paid ?? 0),
-        e.payment_status || '',
-        voucher?.payment_method || e.payment_method || '',
-        String(voucher?.voucher_no || ''),
-        String(voucher?.wht_certificate_no || ''),
-        voucher?.bank_name || '',
-        String(voucher?.cheque_no || ''),
+        clean(e.payment_status),
+        clean(voucher?.payment_method || e.payment_method),
+        clean(voucher?.voucher_no),
+        clean(voucher?.wht_certificate_no),
+        clean(voucher?.bank_name),
+        clean(voucher?.cheque_no),
         voucher?.cheque_date ? thaiDate(voucher.cheque_date) : '',
-        voucher?.notes || e.notes || ''
+        clean(voucher?.notes || e.notes)
       ];
     });
 
