@@ -424,7 +424,14 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         previous_items = db.scalars(
             select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense_id)
         ).all()
-        already_allocated = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0"))
+        allocated_gross = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0"))
+        manual_gross = Decimal("0")
+        if not previous_items:
+            manual_gross = min(
+                Decimal(expense.total_amount or 0),
+                Decimal(expense.net_paid or 0) + Decimal(expense.withholding_tax or 0),
+            )
+        already_allocated = max(allocated_gross, manual_gross)
         remaining = max(Decimal(expense.total_amount or 0) - already_allocated, Decimal("0"))
         if gross > remaining + Decimal("0.01"):
             raise HTTPException(
@@ -471,9 +478,18 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         previous_items = db.scalars(
             select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense.id)
         ).all()
-        cumulative_gross = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0")) + gross
-        cumulative_wht = sum((Decimal(item.withholding_tax or 0) for item in previous_items), Decimal("0")) + wht
-        cumulative_net = sum((Decimal(item.net_amount or 0) for item in previous_items), Decimal("0")) + net
+        if previous_items:
+            baseline_gross = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0"))
+            baseline_wht = sum((Decimal(item.withholding_tax or 0) for item in previous_items), Decimal("0"))
+            baseline_net = sum((Decimal(item.net_amount or 0) for item in previous_items), Decimal("0"))
+        else:
+            baseline_wht = Decimal(expense.withholding_tax or 0)
+            baseline_net = Decimal(expense.net_paid or 0)
+            baseline_gross = min(Decimal(expense.total_amount or 0), baseline_wht + baseline_net)
+
+        cumulative_gross = baseline_gross + gross
+        cumulative_wht = baseline_wht + wht
+        cumulative_net = baseline_net + net
 
         expense.withholding_tax = cumulative_wht
         expense.net_paid = cumulative_net
