@@ -1119,13 +1119,6 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
           <p>{month ? `ประจำเดือน ${monthLabel}` : monthLabel}</p>
         </div>
 
-        <div className="report-kpis">
-          <div><span>จำนวนรายการ</span><strong>{filtered.length}</strong></div>
-          <div><span>ต้นทุนรวม</span><strong>{money(totals.total)}</strong></div>
-          <div><span>จ่ายแล้ว</span><strong>{money(totals.paid)}</strong></div>
-          <div><span>ค้างจ่าย</span><strong>{money(totals.outstanding)}</strong></div>
-        </div>
-
         {view === 'DETAIL' ? (
           <div className="table-wrap report-table-wrap">
             <table className="report-table detail-report">
