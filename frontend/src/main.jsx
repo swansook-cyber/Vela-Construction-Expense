@@ -1300,13 +1300,13 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       .items{margin-top:8px}.items th,.items td{border:1px solid #000;padding:6px;vertical-align:top}
       .items th{background:#f4f4f4;text-align:center}.num{text-align:right;white-space:nowrap}
       .summary{width:48%;margin:8px 0 0 auto}.summary td{border:1px solid #000;padding:6px}.summary td:last-child{text-align:right;font-weight:700}
-      .spacer{flex:1;min-height:56mm}
-      .explain{border:1px solid #000;padding:8px;margin-top:8px;min-height:18mm}
+      .spacer{flex:0 0 24mm;height:24mm}
+      .explain{border:1px solid #000;padding:8px;margin-top:8px;min-height:24mm}
       .sign{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #000;border-right:0;margin-top:8px}
-      .sign .cell{border-right:1px solid #000;text-align:center;min-height:35mm;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+      .sign .cell{border-right:1px solid #000;text-align:center;min-height:38mm;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
       .sign .role{font-weight:700}.sign .date{font-size:9px}
       .warning{margin-top:7px;border:1px solid #a33;color:#a33;padding:6px;font-weight:700}
-      .foot{font-size:8.5px;color:#333;margin-top:5px}
+      .foot{font-size:8.5px;color:#333;margin-top:5px;padding-bottom:2mm}
     </style>
     <div class="pv-page">
       <div class="pv-head">
