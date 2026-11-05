@@ -96,7 +96,7 @@ class PaymentVoucher(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     voucher_no: Mapped[str] = mapped_column(String(40), index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    expense_id: Mapped[int] = mapped_column(ForeignKey("expenses.id"), index=True)
+    expense_id: Mapped[int | None] = mapped_column(ForeignKey("expenses.id"), nullable=True, index=True)
     vendor_id: Mapped[int | None] = mapped_column(ForeignKey("vendors.id"), nullable=True, index=True)
     voucher_date: Mapped[date] = mapped_column(Date)
     gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
@@ -118,6 +118,26 @@ class PaymentVoucher(Base):
     project = relationship("Project")
     expense = relationship("Expense")
     vendor = relationship("Vendor")
+    items = relationship("PaymentVoucherItem", back_populates="voucher", cascade="all, delete-orphan", order_by="PaymentVoucherItem.id")
+
+    @property
+    def expense_ids(self) -> list[int]:
+        if self.items:
+            return [item.expense_id for item in self.items]
+        return [self.expense_id] if self.expense_id is not None else []
+
+
+class PaymentVoucherItem(Base):
+    __tablename__ = "payment_voucher_items"
+    __table_args__ = (UniqueConstraint("expense_id", name="uq_payment_voucher_item_expense"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    voucher_id: Mapped[int] = mapped_column(ForeignKey("payment_vouchers.id", ondelete="CASCADE"), index=True)
+    expense_id: Mapped[int] = mapped_column(ForeignKey("expenses.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    voucher = relationship("PaymentVoucher", back_populates="items")
+    expense = relationship("Expense")
 
 
 class AuditLog(Base):
