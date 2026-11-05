@@ -348,6 +348,7 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
 function VendorModal({ existing, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: existing?.name || '',
+    cheque_payee_name: existing?.cheque_payee_name || '',
     entity_type: existing?.entity_type || 'UNKNOWN',
     tax_id: existing?.tax_id || '',
     phone: existing?.phone || '',
@@ -365,6 +366,7 @@ function VendorModal({ existing, onClose, onSaved }) {
         method: existing ? 'PUT' : 'POST',
         body: JSON.stringify({
           ...form,
+          cheque_payee_name: form.cheque_payee_name?.trim() || null,
           tax_id: form.tax_id || null,
           phone: form.phone || null,
           address: form.address || null,
@@ -387,6 +389,9 @@ function VendorModal({ existing, onClose, onSaved }) {
         <form onSubmit={submit} className="form-grid">
           <label className="wide">ชื่อ
             <input value={form.name} onChange={(e) => set('name', e.target.value)} required autoFocus />
+          </label>
+          <label className="wide">ชื่อจ่ายเช็ค
+            <input value={form.cheque_payee_name} onChange={(e) => set('cheque_payee_name', e.target.value)} placeholder="ถ้าไม่กรอก จะใช้ชื่อผู้ขาย/ผู้รับเหมา" />
           </label>
           <label>ประเภทผู้รับเงิน
             <select value={form.entity_type} onChange={(e) => set('entity_type', e.target.value)}>
@@ -1514,7 +1519,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 
 function ChequePreviewModal({ voucher, onClose }) {
-  const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42 };
+  const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, accountPayeeX:12, accountPayeeY:10 };
   const [cfg,setCfg]=useState(() => {
     try {
       const saved=JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}');
@@ -1532,6 +1537,7 @@ function ChequePreviewModal({ voucher, onClose }) {
   const [showSettings,setShowSettings]=useState(false);
   const set=(k,v)=>setCfg((x)=>({...x,[k]:Number(v)}));
   const date=thaiDate(voucher.cheque_date||voucher.voucher_date);
+  const chequePayee=voucher.cheque_payee_name || voucher.payee_name;
 
   function save(){
     localStorage.setItem('vela-cheque-layout',JSON.stringify(cfg));
@@ -1544,14 +1550,16 @@ function ChequePreviewModal({ voucher, onClose }) {
       @page{size:${cfg.width}mm ${cfg.height}mm;margin:0}
       body{margin:0;background:#fff}
       .cheque-print{position:relative;width:${cfg.width}mm;height:${cfg.height}mm;font-family:Arial,"Noto Sans Thai",sans-serif;color:#000}
-      .c-payee,.c-date,.c-amount{position:absolute;white-space:nowrap}
+      .c-payee,.c-date,.c-amount,.c-account-payee{position:absolute;white-space:nowrap}
       .c-payee{left:${cfg.payeeX}mm;top:${cfg.payeeY}mm;font-size:16px;font-weight:700}
+      .c-account-payee{left:${cfg.accountPayeeX}mm;top:${cfg.accountPayeeY}mm;font-size:11px;font-weight:800;letter-spacing:.08em;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:1mm 5mm}
       .c-date{left:${cfg.dateX}mm;top:${cfg.dateY}mm;font-size:13px}
       .c-amount{left:${cfg.amountX}mm;top:${cfg.amountY}mm;font-size:16px;font-weight:700}
       @media print{.preview-toolbar{display:none!important}.preview-sheet{margin:0!important;box-shadow:none!important;width:auto!important;min-height:0!important}}
     </style>
     <div class="cheque-print">
-      <div class="c-payee">${voucher.payee_name}</div>
+      <div class="c-account-payee">A/C PAYEE ONLY</div>
+      <div class="c-payee">${chequePayee}</div>
       <div class="c-date">${date}</div>
       <div class="c-amount">${money(voucher.net_amount)}</div>
     </div>`);
@@ -1566,7 +1574,8 @@ function ChequePreviewModal({ voucher, onClose }) {
 
       <div style={{overflow:'auto',padding:'12px',background:'#eef1f3',borderRadius:'14px',marginBottom:'16px'}}>
         <div style={{position:'relative',width:`${cfg.width}mm`,height:`${cfg.height}mm`,background:'#fff',border:'1px dashed #999',margin:'0 auto'}}>
-          <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{voucher.payee_name}</div>
+          <div style={{position:'absolute',left:`${cfg.accountPayeeX}mm`,top:`${cfg.accountPayeeY}mm`,fontWeight:800,fontSize:'11px',letterSpacing:'.08em',whiteSpace:'nowrap',borderTop:'1.5px solid #000',borderBottom:'1.5px solid #000',padding:'1mm 5mm'}}>A/C PAYEE ONLY</div>
+          <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{chequePayee}</div>
           <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>
           <div style={{position:'absolute',left:`${cfg.amountX}mm`,top:`${cfg.amountY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{money(voucher.net_amount)}</div>
         </div>
@@ -1588,6 +1597,8 @@ function ChequePreviewModal({ voucher, onClose }) {
           <label>วันที่ Y (mm)<input type="number" step="0.5" value={cfg.dateY} onChange={(e)=>set('dateY',e.target.value)} /></label>
           <label>จำนวนเงิน X (mm)<input type="number" step="0.5" value={cfg.amountX} onChange={(e)=>set('amountX',e.target.value)} /></label>
           <label>จำนวนเงิน Y (mm)<input type="number" step="0.5" value={cfg.amountY} onChange={(e)=>set('amountY',e.target.value)} /></label>
+          <label>A/C PAYEE X (mm)<input type="number" step="0.5" value={cfg.accountPayeeX} onChange={(e)=>set('accountPayeeX',e.target.value)} /></label>
+          <label>A/C PAYEE Y (mm)<input type="number" step="0.5" value={cfg.accountPayeeY} onChange={(e)=>set('accountPayeeY',e.target.value)} /></label>
         </div>
         <div className="actions" style={{marginTop:'10px',marginBottom:'10px'}}>
           <button className="ghost" onClick={()=>{setCfg(defaults);localStorage.removeItem('vela-cheque-layout')}}>คืนค่าเริ่มต้น</button>
@@ -1855,7 +1866,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <tbody>{rows.length===0&&<tr><td colSpan="8" className="empty">ยังไม่มีรายการ</td></tr>}
       {rows.map((v)=><tr key={v.id}><td className="mono">{mode==='wht'?(v.wht_certificate_no||'-'):mode==='cheque'?(v.cheque_no||'-'):v.voucher_no}</td>
         <td>{thaiDate(v.voucher_date)}</td><td>{v.payee_name}</td><td className="amount">{money(v.gross_amount)}</td><td className="amount">{money(v.withholding_tax)}</td><td className="amount">{money(v.net_amount)}</td><td>{v.payment_method||'-'}</td>
-        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?setPreviewCheque(v):printVoucher(v)}>{mode==='cheque'?'Preview':'พิมพ์'}</button>{mode==='voucher'&&<button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button>}</div></td></tr>)}</tbody>
+        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?setPreviewCheque({...v,cheque_payee_name:vendors.find((x)=>x.id===v.vendor_id)?.cheque_payee_name||null}):printVoucher(v)}>{mode==='cheque'?'Preview':'พิมพ์'}</button>{mode==='voucher'&&<button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button>}</div></td></tr>)}</tbody>
     </table></div>
     {showCreate&&<PaymentVoucherModal project={project} expenses={expenses} vendors={vendors} vouchers={vouchers} onClose={()=>setShowCreate(false)} onSaved={async()=>{setShowCreate(false);await load();await onUpdated();}} />}
     {editingPayment&&<PaymentEditModal voucher={editingPayment} onClose={()=>setEditingPayment(null)} onSaved={async()=>{setEditingPayment(null);await load();await onUpdated();}} />}
@@ -2137,6 +2148,7 @@ function App() {
                 <strong>{v.name}</strong>
                 <span>{v.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : v.entity_type === 'JURISTIC' ? 'นิติบุคคล' : 'ยังไม่ระบุประเภทผู้รับเงิน'}</span>
                 <span>{v.tax_id ? `Tax ID: ${v.tax_id}` : 'ไม่ระบุเลขภาษี'}</span>
+                {v.cheque_payee_name && <span>จ่ายเช็ค: {v.cheque_payee_name}</span>}
                 <span>{v.phone || ''}</span>
                 <button className="mini ghost" onClick={() => setEditingVendor(v)}>แก้ไข</button>
               </div>
