@@ -110,3 +110,29 @@ class AuditLogOut(BaseModel):
     actor: str
     details: str | None
     created_at: datetime
+
+
+class PaymentVoucherCreate(BaseModel):
+    project_id: int
+    expense_id: int
+    vendor_id: int | None = None
+    voucher_date: date
+    gross_amount: Decimal
+    withholding_tax: Decimal = Decimal("0")
+    net_amount: Decimal
+    payment_method: str | None = None
+    payee_name: str = Field(min_length=1, max_length=255)
+    cheque_no: str | None = None
+    cheque_date: date | None = None
+    bank_name: str | None = None
+    notes: str | None = None
+
+
+class PaymentVoucherOut(PaymentVoucherCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    voucher_no: str
+    wht_certificate_no: str | None = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
