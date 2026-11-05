@@ -186,13 +186,13 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
             </select>
           </label>
           <label>สถานะการจ่าย
-            <select value={form.payment_status} onChange={(e) => set('payment_status', e.target.value)} disabled={paymentLocked}>
+            <select value={form.payment_status} onChange={(e) => set('payment_status', e.target.value)}>
               <option value="UNPAID">ยังไม่จ่าย</option>
               <option value="PAID">จ่ายแล้ว</option>
             </select>
           </label>
           <label>วิธีจ่าย
-            <select value={form.payment_method} onChange={(e) => set('payment_method', e.target.value)} disabled={paymentLocked}>
+            <select value={form.payment_method} onChange={(e) => set('payment_method', e.target.value)}>
               <option value="">ไม่ระบุ</option>
               <option value="TRANSFER">โอน</option>
               <option value="CASH">เงินสด</option>
