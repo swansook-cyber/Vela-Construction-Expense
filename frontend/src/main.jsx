@@ -1705,7 +1705,9 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     : vouchers;
 
   function printVoucher(v) {
-    const e=expenseMap[v.expense_id];
+    const voucherExpenseIds = v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []);
+    const voucherExpenses = voucherExpenseIds.map((id)=>expenseMap[id]).filter(Boolean);
+    const e=voucherExpenses[0];
     const vendor=vendors.find((x)=>x.id===v.vendor_id);
     const method=({TRANSFER:'โอนเงิน',CASH:'เงินสด',CHEQUE:'เช็ค',CREDIT:'เครดิต / เจ้าหนี้'})[v.payment_method]||v.payment_method||'-';
     printDocument(v.voucher_no,`<style>
@@ -1749,20 +1751,20 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       </div>
       <div class="payment-row">
         <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
-        <div><b>อ้างอิงค่าใช้จ่าย:</b> ${e?.expense_no||'-'}</div>
-        <div><b>เอกสารเลขที่:</b> ${e?.document_no||'-'}</div>
+        <div><b>จำนวนบิล:</b> ${voucherExpenses.length || 1} รายการ</div>
+        <div><b>อ้างอิง:</b> ${voucherExpenses.map((x)=>x.expense_no).join(', ') || '-'}</div>
       </div>
 
       <table class="items">
         <thead><tr><th style="width:8%">วันที่</th><th style="width:14%">เลขเอกสาร</th><th>รายละเอียด</th><th style="width:14%">ยอดเอกสาร</th><th style="width:12%">หัก ณ ที่จ่าย</th><th style="width:14%">จ่ายสุทธิ</th></tr></thead>
-        <tbody><tr>
-          <td>${thaiDate(e?.expense_date)}</td>
-          <td>${e?.document_no||'-'}</td>
-          <td>${e?.description||'-'}${v.income_type? `<br><small>ประเภทเงินได้: ${v.income_type}</small>`:''}</td>
-          <td class="num">${money(v.gross_amount)}</td>
-          <td class="num">${money(v.withholding_tax)}</td>
-          <td class="num"><b>${money(v.net_amount)}</b></td>
-        </tr></tbody>
+        <tbody>${(voucherExpenses.length?voucherExpenses:[e]).filter(Boolean).map((item)=>`<tr>
+          <td>${thaiDate(item?.expense_date)}</td>
+          <td>${item?.document_no||item?.expense_no||'-'}</td>
+          <td>${item?.description||'-'}</td>
+          <td class="num">${money(item?.total_amount)}</td>
+          <td class="num">${money(item?.withholding_tax)}</td>
+          <td class="num"><b>${money(Math.max(Number(item?.total_amount||0)-Number(item?.withholding_tax||0),0))}</b></td>
+        </tr>`).join('')}</tbody>
       </table>
 
       <table class="summary">
@@ -1775,7 +1777,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
 
       <div class="spacer"></div>
 
-      <div class="explain"><b>คำอธิบาย / Explanation</b><br>${v.notes||e?.description||'-'}</div>
+      <div class="explain"><b>คำอธิบาย / Explanation</b><br>${v.notes||voucherExpenses.map((x)=>x.description).join(' / ')||e?.description||'-'}</div>
 
       <div class="sign">
         <div class="cell"><div class="role">ผู้จัดทำ / Prepared By</div><div>........................................</div><div class="date">วันที่ ....../....../......</div></div>
