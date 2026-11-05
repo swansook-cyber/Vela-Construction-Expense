@@ -1196,9 +1196,9 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           </select>
         </label>
         {form.payment_method==='CHEQUE' && <>
-          <label>ธนาคาร<input value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} /></label>
-          <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} /></label>
-          <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} /></label>
+          <label>ธนาคาร<input value={form.bank_name} onChange={(e)=>set('bank_name',e.target.value)} required /></label>
+          <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} required /></label>
+          <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
         </>}
         <div className="calc wide">
           <span>ยอดเอกสาร <b>{money(gross)}</b></span><span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span><span className="total-line">จ่ายสุทธิ <b>{money(net)}</b></span>
@@ -1240,8 +1240,8 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       @page{size:A4 portrait;margin:12mm}
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000;font-size:11px}
       .pv{border:1.4px solid #000;padding:12px}
-      .pv-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;border-bottom:1px solid #000;padding-bottom:10px}
-      .pv-head .company{font-size:12px;line-height:1.5}.pv-head .title{text-align:center}.pv-head .title h1{font-size:22px;margin:0}.pv-head .meta{text-align:right;line-height:1.7}
+      .pv-head{display:grid;grid-template-columns:1.35fr .9fr 1fr;align-items:start;gap:14px;border-bottom:1px solid #000;padding-bottom:10px}
+      .pv-head .company{font-size:11px;line-height:1.45;overflow-wrap:normal;word-break:normal}.pv-head .title{text-align:center}.pv-head .title h1{font-size:22px;margin:0}.pv-head .meta{text-align:right;line-height:1.7}
       .pv-party{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid #000}.pv-party div{padding:7px 8px}.pv-party .label{font-weight:700;border-right:1px solid #000}
       .pv-table{width:100%;border-collapse:collapse;margin-top:10px}.pv-table th,.pv-table td{border:1px solid #000;padding:7px;vertical-align:top}
       .pv-table th{background:#f3f3f3}.pv-table td.num{text-align:right;white-space:nowrap}
@@ -1277,6 +1277,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         <tr><td><b>ยอดจ่ายสุทธิ</b></td><td><b>${money(v.net_amount)}</b></td></tr>
       </table>
 
+      ${v.payment_method==='CHEQUE' && (!v.cheque_no || !v.bank_name) ? '<div style="margin-top:10px;border:1px solid #a33;padding:8px;color:#a33;font-weight:700">ข้อมูลเช็คยังไม่ครบ — กรุณาระบุธนาคารและเลขที่เช็คก่อนใช้เอกสารฉบับนี้จริง</div>' : ''}
       <div class="pv-pay">
         <div><b>วิธีจ่าย:</b> ${method}</div>
         <div><b>เลขที่เช็ค / อ้างอิง:</b> ${v.cheque_no||'-'}</div>
