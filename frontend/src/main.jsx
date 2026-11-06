@@ -1857,7 +1857,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       @page{size:A4 portrait;margin:10mm}
       html,body{margin:0;padding:0}
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000;font-size:10.5px}
-      .pv-page{height:277mm;border:1.2px solid #000;padding:8mm;display:flex;flex-direction:column}
+      .pv-page{box-sizing:border-box;width:190mm;height:277mm;border:1.2px solid #000;padding:8mm;display:flex;flex-direction:column;overflow:hidden}
       .pv-head{display:grid;grid-template-columns:1.45fr .9fr .9fr;align-items:start;gap:10px;border-bottom:1px solid #000;padding-bottom:7px}
       .company{font-size:10.5px;line-height:1.45}.company b{font-size:12px}
       .title{text-align:center}.title h1{font-size:22px;margin:0;line-height:1.1}.title b{font-size:10px}
