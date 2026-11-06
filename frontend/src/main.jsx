@@ -2163,8 +2163,14 @@ function App() {
   useEffect(() => { loadBase(); }, []);
 
   async function voidExpense(expense) {
+    if (expense.payment_status !== 'UNPAID' || Number(expense.net_paid || 0) > 0) {
+      setError('รายการที่มีการจ่ายแล้วต้องไม่ยกเลิกจากทะเบียนค่าใช้จ่าย');
+      return;
+    }
     const reason = window.prompt(`เหตุผลที่ยกเลิก ${expense.expense_no}`);
     if (!reason || reason.trim().length < 3) return;
+    const confirmed = window.confirm(`ยืนยันยกเลิก ${expense.expense_no} ?\n\nรายการจะไม่ถูกลบ แต่จะเปลี่ยนสถานะเป็น VOID และไม่ถูกนับใน Dashboard/รายงาน`);
+    if (!confirmed) return;
     try {
       await api(`/expenses/${expense.id}/void`, {
         method: 'POST',
@@ -2318,7 +2324,7 @@ function App() {
                       <div className="row-actions">
                         <button className="mini ghost" title="แก้ไข" aria-label={`แก้ไข ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}><span aria-hidden="true">✎</span><span className="action-label">แก้ไข</span></button>
                         <button className="mini ghost" title={e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'} aria-label={`${e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'} ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}><span aria-hidden="true">▣</span><span className="action-label">{e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}</span></button>
-                        <button className="mini danger" title="ยกเลิก" aria-label={`ยกเลิก ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => voidExpense(e)}><span aria-hidden="true">×</span><span className="action-label">ยกเลิก</span></button>
+                        <button className="mini danger" title={e.payment_status==='UNPAID'?'ยกเลิก':'มีการจ่ายแล้ว — ยกเลิกไม่ได้'} aria-label={`ยกเลิก ${e.expense_no}`} disabled={e.payment_status !== 'UNPAID' || Number(e.net_paid || 0) > 0} onClick={() => voidExpense(e)}><span aria-hidden="true">×</span><span className="action-label">ยกเลิก</span></button>
                       </div>
                     </td>
                   </tr>
