@@ -1406,12 +1406,19 @@ function AuditPanel() {
 }
 
 
-function printDocument(title, html) {
+function printDocument(title, html, options = {}) {
   const win = window.open('', '_blank', 'width=1100,height=900');
   if (!win) return;
+  const customWidth = Number(options.width || 0);
+  const customHeight = Number(options.height || 0);
+  const hasCustomSize = customWidth > 0 && customHeight > 0;
+  const pageSize = hasCustomSize ? `${customWidth}mm ${customHeight}mm` : 'A4';
+  const pageMargin = options.margin != null ? `${Number(options.margin)}mm` : (hasCustomSize ? '0' : '14mm');
+  const previewWidth = hasCustomSize ? `${customWidth}mm` : '210mm';
+  const previewMinHeight = hasCustomSize ? `${customHeight}mm` : '297mm';
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
   <style>
-    @page{size:A4;margin:14mm}
+    @page{size:${pageSize};margin:${pageMargin}}
     body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111;margin:0;background:#eef1f3}
     h1,h2,h3,p{margin:0}.head{text-align:center;margin-bottom:22px}.head h2{font-size:24px}
     .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:18px 0}
@@ -1424,7 +1431,7 @@ function printDocument(title, html) {
     .preview-toolbar strong{font-size:14px}.preview-actions{display:flex;gap:8px}
     .preview-actions button{border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}
     .preview-actions .print{background:#fff;color:#17212b}.preview-actions .close{background:#3b4650;color:#fff}
-    .preview-sheet{width:210mm;min-height:297mm;margin:18px auto;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.16)}
+    .preview-sheet{width:${previewWidth};min-height:${previewMinHeight};margin:18px auto;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.16)}
     @media print{
       body{background:#fff}
       .preview-toolbar{display:none!important}
@@ -1746,7 +1753,7 @@ function ChequePreviewModal({ voucher, onClose }) {
       ${isScb ? `<div class="c-date-boxes">${scbDateDigits.map((digit,index)=>`<span class="c-date-box ${index===2||index===4?'c-date-gap':''}">${digit}</span>`).join('')}</div>` : `<div class="c-date">${date}</div>`}
       <div class="c-amount-text">${amountText}</div>
       <div class="c-amount">${money(voucher.net_amount)}</div>
-    </div>`);
+    </div>`, { width: cfg.width, height: cfg.height, margin: 0 });
   }
 
   return <div className="modal-backdrop" onMouseDown={onClose}>
