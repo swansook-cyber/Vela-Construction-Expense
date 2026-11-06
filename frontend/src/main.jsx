@@ -1812,7 +1812,6 @@ function ChequePreviewModal({ voucher, onClose }) {
         </div>
       </>}
 
-      <div className="info-message">{isScb?'ไทยพาณิชย์: วันที่ 8 หลัก DD MM YYYY (พ.ศ.) · ':''}แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
       <div className="actions" style={{marginTop:'14px'}}>
         <button onClick={openPrint}>เปิด Preview พิมพ์</button>
       </div>
