@@ -1768,7 +1768,7 @@ function ChequePreviewModal({ voucher, onClose }) {
         <div style={{position:'relative',width:`${cfg.width}mm`,height:`${cfg.height}mm`,background:'#fff',border:'1px dashed #999',margin:'0 auto'}}>
           {accountPayee&&<div style={{position:'absolute',left:`${cfg.accountPayeeX}mm`,top:`${cfg.accountPayeeY}mm`,fontWeight:800,fontSize:'11px',letterSpacing:'.08em',whiteSpace:'nowrap',borderTop:'1.5px solid #000',borderBottom:'1.5px solid #000',padding:'1mm 5mm'}}>A/C PAYEE ONLY</div>}
           <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{chequePayee}</div>
-          {isScb ? <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,display:'flex',gap:'.7mm'}}>{scbDateDigits.map((digit,index)=><span key={index} style={{width:'5mm',height:'5mm',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,boxSizing:'border-box',marginLeft:index===2||index===4?'1.1mm':0}}>{digit}</span>)}</div> : <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>}
+          {isScb ? <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,display:'flex',gap:'.7mm'}}>{scbDateDigits.map((digit,index)=><span key={index} style={{width:'5mm',height:'5mm',display:'flex',alignItems:'center',justifyContent:'center',fontSize:`${cfg.dateFontSize}px`,fontWeight:700,boxSizing:'border-box',marginLeft:index===2||index===4?'1.1mm':0}}>{digit}</span>)}</div> : <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:`${cfg.dateFontSize}px`,whiteSpace:'nowrap'}}>{date}</div>}
           <div style={{position:'absolute',left:`${cfg.amountTextX}mm`,top:`${cfg.amountTextY}mm`,fontWeight:700,fontSize:`${cfg.amountTextFontSize}px`,whiteSpace:'nowrap'}}>{amountText}</div>
           <div style={{position:'absolute',left:`${cfg.amountX}mm`,top:`${cfg.amountY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{money(voucher.net_amount)}</div>
         </div>
@@ -1780,7 +1780,7 @@ function ChequePreviewModal({ voucher, onClose }) {
           A/C PAYEE ONLY
         </label>
         <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-          {isScb&&<button className="mini ghost" onClick={()=>setCfg(scbDefaults)}>ใช้ค่า SCB V2</button>}
+          {isScb&&<button className="mini ghost" onClick={()=>setCfg(scbDefaults)}>ใช้ค่าโรงงาน SCB V2</button>}
           <button className="mini ghost" onClick={()=>setShowSettings((x)=>!x)}>
           {showSettings?'ซ่อนการตั้งค่า':'⚙ ตั้งค่าตำแหน่ง'}
           </button>
@@ -1795,6 +1795,7 @@ function ChequePreviewModal({ voucher, onClose }) {
           <label>ชื่อผู้รับ Y (mm)<input type="number" step="0.5" value={cfg.payeeY} onChange={(e)=>set('payeeY',e.target.value)} /></label>
           <label>วันที่ X (mm)<input type="number" step="0.5" value={cfg.dateX} onChange={(e)=>set('dateX',e.target.value)} /></label>
           <label>วันที่ Y (mm)<input type="number" step="0.5" value={cfg.dateY} onChange={(e)=>set('dateY',e.target.value)} /></label>
+          <label>ขนาดตัวเลขวันที่ (px)<input type="number" min="10" max="24" step="1" value={cfg.dateFontSize} onChange={(e)=>set('dateFontSize',e.target.value)} /></label>
           <label>จำนวนเงิน X (mm)<input type="number" step="0.5" value={cfg.amountX} onChange={(e)=>set('amountX',e.target.value)} /></label>
           <label>จำนวนเงิน Y (mm)<input type="number" step="0.5" value={cfg.amountY} onChange={(e)=>set('amountY',e.target.value)} /></label>
           <label>จำนวนเงินตัวอักษร X (mm)<input type="number" step="0.5" value={cfg.amountTextX} onChange={(e)=>set('amountTextX',e.target.value)} /></label>
@@ -1804,8 +1805,8 @@ function ChequePreviewModal({ voucher, onClose }) {
           <label>A/C PAYEE Y (mm)<input type="number" step="0.5" value={cfg.accountPayeeY} onChange={(e)=>set('accountPayeeY',e.target.value)} /></label>
         </div>
         <div className="actions" style={{marginTop:'10px',marginBottom:'10px'}}>
-          <button className="ghost" onClick={()=>{setCfg(presetDefaults);localStorage.removeItem(storageKey)}}>คืนค่าเริ่มต้น</button>
-          <button className="ghost" onClick={save}>บันทึกตำแหน่ง</button>
+          <button className="ghost" onClick={()=>{try{const d=JSON.parse(localStorage.getItem(defaultKey)||'{}');setCfg({...presetDefaults,...d})}catch{setCfg(presetDefaults)}}}>คืนค่าที่บันทึกล่าสุด</button>
+          <button className="ghost" onClick={save}>บันทึกเป็นค่าเริ่มต้น</button>
         </div>
       </>}
 
