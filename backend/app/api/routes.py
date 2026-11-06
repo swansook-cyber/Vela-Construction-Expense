@@ -312,6 +312,18 @@ def void_expense(expense_id: int, payload: ExpenseVoid, db: Session = Depends(ge
     if expense.payment_status == "VOID":
         raise HTTPException(status_code=409, detail="Expense is already voided")
 
+    linked_item = db.scalar(
+        select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense_id)
+    )
+    linked_legacy_voucher = db.scalar(
+        select(PaymentVoucher).where(PaymentVoucher.expense_id == expense_id)
+    )
+    if linked_item or linked_legacy_voucher or expense.payment_status in {"PAID", "PARTIAL"} or Decimal(expense.net_paid or 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="รายการนี้มีการจ่ายหรือใบสำคัญจ่ายแล้ว ไม่สามารถยกเลิกจากทะเบียนค่าใช้จ่ายได้",
+        )
+
     before = expense_snapshot(expense)
     expense.payment_status = "VOID"
     expense.void_reason = payload.reason
