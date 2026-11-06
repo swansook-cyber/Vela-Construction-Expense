@@ -1741,9 +1741,9 @@ function ChequePreviewModal({ voucher, onClose }) {
       .c-payee{left:${cfg.payeeX}mm;top:${cfg.payeeY}mm;font-size:16px;font-weight:700}
       .c-amount-text{left:${cfg.amountTextX}mm;top:${cfg.amountTextY}mm;font-size:${cfg.amountTextFontSize}px;font-weight:700}
       .c-account-payee{left:${cfg.accountPayeeX}mm;top:${cfg.accountPayeeY}mm;font-size:11px;font-weight:800;letter-spacing:.08em;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:1mm 5mm}
-      .c-date{left:${cfg.dateX}mm;top:${cfg.dateY}mm;font-size:13px}
+      .c-date{left:${cfg.dateX}mm;top:${cfg.dateY}mm;font-size:${cfg.dateFontSize}px}
       .c-date-boxes{position:absolute;left:${cfg.dateX}mm;top:${cfg.dateY}mm;display:flex;gap:.7mm}
-      .c-date-box{width:5mm;height:5mm;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-sizing:border-box}
+      .c-date-box{width:5mm;height:5mm;display:flex;align-items:center;justify-content:center;font-size:${cfg.dateFontSize}px;font-weight:700;box-sizing:border-box}
       .c-date-gap{margin-left:1.1mm}
       .c-amount{left:${cfg.amountX}mm;top:${cfg.amountY}mm;font-size:16px;font-weight:700}
       @media print{.preview-toolbar{display:none!important}.preview-sheet{margin:0!important;box-shadow:none!important;width:auto!important;min-height:0!important}}
