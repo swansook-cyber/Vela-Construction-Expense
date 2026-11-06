@@ -1735,7 +1735,7 @@ function ChequePreviewModal({ voucher, onClose }) {
       .c-account-payee{left:${cfg.accountPayeeX}mm;top:${cfg.accountPayeeY}mm;font-size:11px;font-weight:800;letter-spacing:.08em;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:1mm 5mm}
       .c-date{left:${cfg.dateX}mm;top:${cfg.dateY}mm;font-size:13px}
       .c-date-boxes{position:absolute;left:${cfg.dateX}mm;top:${cfg.dateY}mm;display:flex;gap:.7mm}
-      .c-date-box{width:5mm;height:5mm;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-sizing:border-box}
+      .c-date-box{width:5mm;height:5mm;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-sizing:border-box}
       .c-date-gap{margin-left:1.1mm}
       .c-amount{left:${cfg.amountX}mm;top:${cfg.amountY}mm;font-size:16px;font-weight:700}
       @media print{.preview-toolbar{display:none!important}.preview-sheet{margin:0!important;box-shadow:none!important;width:auto!important;min-height:0!important}}
@@ -1760,7 +1760,7 @@ function ChequePreviewModal({ voucher, onClose }) {
         <div style={{position:'relative',width:`${cfg.width}mm`,height:`${cfg.height}mm`,background:'#fff',border:'1px dashed #999',margin:'0 auto'}}>
           {accountPayee&&<div style={{position:'absolute',left:`${cfg.accountPayeeX}mm`,top:`${cfg.accountPayeeY}mm`,fontWeight:800,fontSize:'11px',letterSpacing:'.08em',whiteSpace:'nowrap',borderTop:'1.5px solid #000',borderBottom:'1.5px solid #000',padding:'1mm 5mm'}}>A/C PAYEE ONLY</div>}
           <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{chequePayee}</div>
-          {isScb ? <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,display:'flex',gap:'.7mm'}}>{scbDateDigits.map((digit,index)=><span key={index} style={{width:'5mm',height:'5mm',border:'1px solid #000',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,boxSizing:'border-box',marginLeft:index===2||index===4?'1.1mm':0}}>{digit}</span>)}</div> : <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>}
+          {isScb ? <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,display:'flex',gap:'.7mm'}}>{scbDateDigits.map((digit,index)=><span key={index} style={{width:'5mm',height:'5mm',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,boxSizing:'border-box',marginLeft:index===2||index===4?'1.1mm':0}}>{digit}</span>)}</div> : <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>}
           <div style={{position:'absolute',left:`${cfg.amountTextX}mm`,top:`${cfg.amountTextY}mm`,fontWeight:700,fontSize:`${cfg.amountTextFontSize}px`,whiteSpace:'nowrap'}}>{amountText}</div>
           <div style={{position:'absolute',left:`${cfg.amountX}mm`,top:`${cfg.amountY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{money(voucher.net_amount)}</div>
         </div>
