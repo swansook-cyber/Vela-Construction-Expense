@@ -1695,6 +1695,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 
 function ChequePreviewModal({ voucher, onClose }) {
+  const isScb=voucher.bank_name==='ธนาคารไทยพาณิชย์';
   const generalDefaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
   const scbDefaults = { width:178, height:89, payeeX:14, payeeY:20, dateX:132, dateY:8, amountX:151, amountY:31, amountTextX:14, amountTextY:31, amountTextFontSize:13, accountPayeeX:46, accountPayeeY:35 };
   const presetDefaults = isScb ? scbDefaults : generalDefaults;
@@ -1711,7 +1712,6 @@ function ChequePreviewModal({ voucher, onClose }) {
   const set=(k,v)=>setCfg((x)=>({...x,[k]:Number(v)}));
   const chequeDateValue=voucher.cheque_date||voucher.voucher_date;
   const date=thaiDate(chequeDateValue);
-  const isScb=voucher.bank_name==='ธนาคารไทยพาณิชย์';
   const scbDateDigits=(() => {
     if (!chequeDateValue) return [];
     const [y,m,d]=String(chequeDateValue).slice(0,10).split('-').map(Number);
