@@ -1696,14 +1696,18 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 function ChequePreviewModal({ voucher, onClose }) {
   const isScb=voucher.bank_name==='ธนาคารไทยพาณิชย์';
-  const generalDefaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
-  const scbDefaults = { width:178, height:89, payeeX:14, payeeY:20, dateX:132, dateY:8, amountX:151, amountY:31, amountTextX:14, amountTextY:31, amountTextFontSize:13, accountPayeeX:46, accountPayeeY:35 };
+  const generalDefaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, dateFontSize:13, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
+  const scbDefaults = { width:178, height:89, payeeX:14, payeeY:20, dateX:132, dateY:8, dateFontSize:15, amountX:151, amountY:31, amountTextX:14, amountTextY:31, amountTextFontSize:13, accountPayeeX:46, accountPayeeY:35 };
   const presetDefaults = isScb ? scbDefaults : generalDefaults;
   const storageKey = isScb ? 'vela-cheque-layout-scb-v2' : 'vela-cheque-layout';
+  const defaultKey = isScb ? 'vela-cheque-layout-scb-v2-default' : 'vela-cheque-layout-default';
   const [cfg,setCfg]=useState(() => {
     try {
       const saved=JSON.parse(localStorage.getItem(storageKey)||'{}');
-      return {...presetDefaults,...saved};
+      const userDefault=JSON.parse(localStorage.getItem(defaultKey)||'{}');
+      const effective={...presetDefaults,...userDefault,...saved};
+      if (Object.keys(saved).length && !Object.keys(userDefault).length) localStorage.setItem(defaultKey,JSON.stringify(effective));
+      return effective;
     }
     catch { return presetDefaults; }
   });
@@ -1723,6 +1727,7 @@ function ChequePreviewModal({ voucher, onClose }) {
 
   function save(){
     localStorage.setItem(storageKey,JSON.stringify(cfg));
+    localStorage.setItem(defaultKey,JSON.stringify(cfg));
   }
 
   function openPrint(){
