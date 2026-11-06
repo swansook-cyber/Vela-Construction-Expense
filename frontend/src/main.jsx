@@ -1695,20 +1695,16 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 
 function ChequePreviewModal({ voucher, onClose }) {
-  const defaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
+  const generalDefaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
+  const scbDefaults = { width:178, height:89, payeeX:14, payeeY:20, dateX:132, dateY:8, amountX:151, amountY:31, amountTextX:14, amountTextY:31, amountTextFontSize:13, accountPayeeX:46, accountPayeeY:35 };
+  const presetDefaults = isScb ? scbDefaults : generalDefaults;
+  const storageKey = isScb ? 'vela-cheque-layout-scb-v2' : 'vela-cheque-layout';
   const [cfg,setCfg]=useState(() => {
     try {
-      const saved=JSON.parse(localStorage.getItem('vela-cheque-layout')||'{}');
-      if (saved.width===190 && saved.height===82) {
-        const migrated={...saved,width:178,height:89};
-        if (saved.dateX===146) migrated.dateX=134;
-        if (saved.amountX===146) migrated.amountX=134;
-        localStorage.setItem('vela-cheque-layout',JSON.stringify(migrated));
-        return {...defaults,...migrated};
-      }
-      return {...defaults,...saved};
+      const saved=JSON.parse(localStorage.getItem(storageKey)||'{}');
+      return {...presetDefaults,...saved};
     }
-    catch { return defaults; }
+    catch { return presetDefaults; }
   });
   const [showSettings,setShowSettings]=useState(false);
   const [accountPayee,setAccountPayee]=useState(true);
@@ -1726,7 +1722,7 @@ function ChequePreviewModal({ voucher, onClose }) {
   const amountText=thaiBahtText(voucher.net_amount);
 
   function save(){
-    localStorage.setItem('vela-cheque-layout',JSON.stringify(cfg));
+    localStorage.setItem(storageKey,JSON.stringify(cfg));
   }
 
   function openPrint(){
@@ -1759,7 +1755,7 @@ function ChequePreviewModal({ voucher, onClose }) {
   return <div className="modal-backdrop" onMouseDown={onClose}>
     <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="modal-head">
-        <div><p className="eyebrow">Cheque Calibration</p><h2>ตัวอย่างพิมพ์เช็ค</h2><p>{voucher.bank_name||'-'} · {voucher.cheque_no||'-'}</p></div>
+        <div><p className="eyebrow">Cheque Calibration</p><h2>ตัวอย่างพิมพ์เช็ค</h2><p>{voucher.bank_name||'-'} · {voucher.cheque_no||'-'}{isScb?' · SCB Preset V2':''}</p></div>
         <button className="ghost icon" onClick={onClose}>×</button>
       </div>
 
@@ -1778,9 +1774,12 @@ function ChequePreviewModal({ voucher, onClose }) {
           <input type="checkbox" checked={accountPayee} onChange={(e)=>setAccountPayee(e.target.checked)} style={{width:'18px',height:'18px'}} />
           A/C PAYEE ONLY
         </label>
-        <button className="mini ghost" onClick={()=>setShowSettings((x)=>!x)}>
+        <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+          {isScb&&<button className="mini ghost" onClick={()=>setCfg(scbDefaults)}>ใช้ค่า SCB V2</button>}
+          <button className="mini ghost" onClick={()=>setShowSettings((x)=>!x)}>
           {showSettings?'ซ่อนการตั้งค่า':'⚙ ตั้งค่าตำแหน่ง'}
-        </button>
+          </button>
+        </div>
       </div>
 
       {showSettings&&<>
@@ -1800,12 +1799,12 @@ function ChequePreviewModal({ voucher, onClose }) {
           <label>A/C PAYEE Y (mm)<input type="number" step="0.5" value={cfg.accountPayeeY} onChange={(e)=>set('accountPayeeY',e.target.value)} /></label>
         </div>
         <div className="actions" style={{marginTop:'10px',marginBottom:'10px'}}>
-          <button className="ghost" onClick={()=>{setCfg(defaults);localStorage.removeItem('vela-cheque-layout')}}>คืนค่าเริ่มต้น</button>
+          <button className="ghost" onClick={()=>{setCfg(presetDefaults);localStorage.removeItem(storageKey)}}>คืนค่าเริ่มต้น</button>
           <button className="ghost" onClick={save}>บันทึกตำแหน่ง</button>
         </div>
       </>}
 
-      <div className="info-message">{isScb?'ไทยพาณิชย์: วันที่จะแสดงเป็น 8 หลักแยกช่อง DD MM YYYY (พ.ศ.) · ':''}แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
+      <div className="info-message">{isScb?'SCB Preset V2 จากภาพเช็คจริง · วันที่ 8 หลัก DD MM YYYY (พ.ศ.) · ':''}แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
       <div className="actions" style={{marginTop:'14px'}}>
         <button onClick={openPrint}>เปิด Preview พิมพ์</button>
       </div>
