@@ -1704,8 +1704,17 @@ function ChequePreviewModal({ voucher, onClose }) {
     catch { return defaults; }
   });
   const [showSettings,setShowSettings]=useState(false);
+  const [accountPayee,setAccountPayee]=useState(true);
   const set=(k,v)=>setCfg((x)=>({...x,[k]:Number(v)}));
-  const date=thaiDate(voucher.cheque_date||voucher.voucher_date);
+  const chequeDateValue=voucher.cheque_date||voucher.voucher_date;
+  const date=thaiDate(chequeDateValue);
+  const isScb=voucher.bank_name==='ธนาคารไทยพาณิชย์';
+  const scbDateDigits=(() => {
+    if (!chequeDateValue) return [];
+    const [y,m,d]=String(chequeDateValue).slice(0,10).split('-').map(Number);
+    if (!y||!m||!d) return [];
+    return (`${String(d).padStart(2,'0')}${String(m).padStart(2,'0')}${String(y+543)}`).split('');
+  })();
   const chequePayee=voucher.cheque_payee_name || voucher.payee_name;
   const amountText=thaiBahtText(voucher.net_amount);
 
