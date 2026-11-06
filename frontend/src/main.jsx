@@ -1696,20 +1696,22 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
 
 function ChequePreviewModal({ voucher, onClose }) {
   const isScb=voucher.bank_name==='ธนาคารไทยพาณิชย์';
-  const generalDefaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, dateFontSize:13, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
-  const scbDefaults = { width:178, height:89, payeeX:14, payeeY:20, dateX:132, dateY:8, dateFontSize:15, amountX:151, amountY:31, amountTextX:14, amountTextY:31, amountTextFontSize:13, accountPayeeX:46, accountPayeeY:35 };
-  const presetDefaults = isScb ? scbDefaults : generalDefaults;
-  const storageKey = isScb ? 'vela-cheque-layout-scb-v2' : 'vela-cheque-layout';
-  const defaultKey = isScb ? 'vela-cheque-layout-scb-v2-default' : 'vela-cheque-layout-default';
+  const fallbackDefaults = { width:178, height:89, payeeX:18, payeeY:30, dateX:134, dateY:12, dateFontSize:isScb?15:13, amountX:134, amountY:42, amountTextX:18, amountTextY:46, amountTextFontSize:13, accountPayeeX:12, accountPayeeY:10 };
+  const storageKey = isScb ? 'vela-cheque-layout-scb' : 'vela-cheque-layout';
+  const defaultKey = isScb ? 'vela-cheque-layout-scb-default' : 'vela-cheque-layout-default';
   const [cfg,setCfg]=useState(() => {
     try {
       const saved=JSON.parse(localStorage.getItem(storageKey)||'{}');
       const userDefault=JSON.parse(localStorage.getItem(defaultKey)||'{}');
-      const effective={...presetDefaults,...userDefault,...saved};
-      if (Object.keys(saved).length && !Object.keys(userDefault).length) localStorage.setItem(defaultKey,JSON.stringify(effective));
+      const legacySaved=isScb ? JSON.parse(localStorage.getItem('vela-cheque-layout-scb-v2')||'{}') : {};
+      const legacyDefault=isScb ? JSON.parse(localStorage.getItem('vela-cheque-layout-scb-v2-default')||'{}') : {};
+      const effective={...fallbackDefaults,...legacyDefault,...userDefault,...legacySaved,...saved};
+      if (!Object.keys(userDefault).length && (Object.keys(saved).length || Object.keys(legacySaved).length || Object.keys(legacyDefault).length)) {
+        localStorage.setItem(defaultKey,JSON.stringify(effective));
+      }
       return effective;
     }
-    catch { return presetDefaults; }
+    catch { return fallbackDefaults; }
   });
   const [showSettings,setShowSettings]=useState(false);
   const [accountPayee,setAccountPayee]=useState(true);
@@ -1760,7 +1762,7 @@ function ChequePreviewModal({ voucher, onClose }) {
   return <div className="modal-backdrop" onMouseDown={onClose}>
     <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="modal-head">
-        <div><p className="eyebrow">Cheque Calibration</p><h2>ตัวอย่างพิมพ์เช็ค</h2><p>{voucher.bank_name||'-'} · {voucher.cheque_no||'-'}{isScb?' · SCB Preset V2':''}</p></div>
+        <div><p className="eyebrow">Cheque Calibration</p><h2>ตัวอย่างพิมพ์เช็ค</h2><p>{voucher.bank_name||'-'} · {voucher.cheque_no||'-'}</p></div>
         <button className="ghost icon" onClick={onClose}>×</button>
       </div>
 
@@ -1780,7 +1782,7 @@ function ChequePreviewModal({ voucher, onClose }) {
           A/C PAYEE ONLY
         </label>
         <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-          {isScb&&<button className="mini ghost" onClick={()=>setCfg(scbDefaults)}>ใช้ค่าโรงงาน SCB V2</button>}
+
           <button className="mini ghost" onClick={()=>setShowSettings((x)=>!x)}>
           {showSettings?'ซ่อนการตั้งค่า':'⚙ ตั้งค่าตำแหน่ง'}
           </button>
@@ -1805,12 +1807,12 @@ function ChequePreviewModal({ voucher, onClose }) {
           <label>A/C PAYEE Y (mm)<input type="number" step="0.5" value={cfg.accountPayeeY} onChange={(e)=>set('accountPayeeY',e.target.value)} /></label>
         </div>
         <div className="actions" style={{marginTop:'10px',marginBottom:'10px'}}>
-          <button className="ghost" onClick={()=>{try{const d=JSON.parse(localStorage.getItem(defaultKey)||'{}');setCfg({...presetDefaults,...d})}catch{setCfg(presetDefaults)}}}>คืนค่าที่บันทึกล่าสุด</button>
+          <button className="ghost" onClick={()=>{try{const d=JSON.parse(localStorage.getItem(defaultKey)||'{}');setCfg({...fallbackDefaults,...d})}catch{setCfg(fallbackDefaults)}}}>คืนค่าที่บันทึกล่าสุด</button>
           <button className="ghost" onClick={save}>บันทึกเป็นค่าเริ่มต้น</button>
         </div>
       </>}
 
-      <div className="info-message">{isScb?'SCB Preset V2 จากภาพเช็คจริง · วันที่ 8 หลัก DD MM YYYY (พ.ศ.) · ':''}แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
+      <div className="info-message">{isScb?'ไทยพาณิชย์: วันที่ 8 หลัก DD MM YYYY (พ.ศ.) · ':''}แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
       <div className="actions" style={{marginTop:'14px'}}>
         <button onClick={openPrint}>เปิด Preview พิมพ์</button>
       </div>
