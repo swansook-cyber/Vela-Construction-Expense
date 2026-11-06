@@ -1758,15 +1758,19 @@ function ChequePreviewModal({ voucher, onClose }) {
 
       <div style={{overflow:'auto',padding:'12px',background:'#eef1f3',borderRadius:'14px',marginBottom:'16px'}}>
         <div style={{position:'relative',width:`${cfg.width}mm`,height:`${cfg.height}mm`,background:'#fff',border:'1px dashed #999',margin:'0 auto'}}>
-          <div style={{position:'absolute',left:`${cfg.accountPayeeX}mm`,top:`${cfg.accountPayeeY}mm`,fontWeight:800,fontSize:'11px',letterSpacing:'.08em',whiteSpace:'nowrap',borderTop:'1.5px solid #000',borderBottom:'1.5px solid #000',padding:'1mm 5mm'}}>A/C PAYEE ONLY</div>
+          {accountPayee&&<div style={{position:'absolute',left:`${cfg.accountPayeeX}mm`,top:`${cfg.accountPayeeY}mm`,fontWeight:800,fontSize:'11px',letterSpacing:'.08em',whiteSpace:'nowrap',borderTop:'1.5px solid #000',borderBottom:'1.5px solid #000',padding:'1mm 5mm'}}>A/C PAYEE ONLY</div>}
           <div style={{position:'absolute',left:`${cfg.payeeX}mm`,top:`${cfg.payeeY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{chequePayee}</div>
-          <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>
+          {isScb ? <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,display:'flex',gap:'.7mm'}}>{scbDateDigits.map((digit,index)=><span key={index} style={{width:'5mm',height:'5mm',border:'1px solid #000',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,boxSizing:'border-box',marginLeft:index===2||index===4?'1.1mm':0}}>{digit}</span>)}</div> : <div style={{position:'absolute',left:`${cfg.dateX}mm`,top:`${cfg.dateY}mm`,fontSize:'13px',whiteSpace:'nowrap'}}>{date}</div>}
           <div style={{position:'absolute',left:`${cfg.amountTextX}mm`,top:`${cfg.amountTextY}mm`,fontWeight:700,fontSize:`${cfg.amountTextFontSize}px`,whiteSpace:'nowrap'}}>{amountText}</div>
           <div style={{position:'absolute',left:`${cfg.amountX}mm`,top:`${cfg.amountY}mm`,fontWeight:700,fontSize:'16px',whiteSpace:'nowrap'}}>{money(voucher.net_amount)}</div>
         </div>
       </div>
 
-      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'12px',marginBottom:'10px',flexWrap:'wrap'}}>
+        <label style={{display:'flex',alignItems:'center',gap:'8px',margin:0,fontWeight:700}}>
+          <input type="checkbox" checked={accountPayee} onChange={(e)=>setAccountPayee(e.target.checked)} style={{width:'18px',height:'18px'}} />
+          A/C PAYEE ONLY
+        </label>
         <button className="mini ghost" onClick={()=>setShowSettings((x)=>!x)}>
           {showSettings?'ซ่อนการตั้งค่า':'⚙ ตั้งค่าตำแหน่ง'}
         </button>
@@ -1794,7 +1798,7 @@ function ChequePreviewModal({ voucher, onClose }) {
         </div>
       </>}
 
-      <div className="info-message">แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
+      <div className="info-message">{isScb?'ไทยพาณิชย์: วันที่จะแสดงเป็น 8 หลักแยกช่อง DD MM YYYY (พ.ศ.) · ':''}แนะนำให้ทดสอบบนกระดาษธรรมดาก่อนวางเช็คจริง และตั้ง Scale = 100% / Actual size ในหน้าพิมพ์</div>
       <div className="actions" style={{marginTop:'14px'}}>
         <button onClick={openPrint}>เปิด Preview พิมพ์</button>
       </div>
