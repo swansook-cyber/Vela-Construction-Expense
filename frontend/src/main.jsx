@@ -1420,11 +1420,7 @@ function printDocument(title, html, options = {}) {
   <style>
     @page{size:${pageSize};margin:${pageMargin}}
     body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111;margin:0;background:#eef1f3}
-    h1,h2,h3,p{margin:0}.head{text-align:center;margin-bottom:22px}.head h2{font-size:24px}
-    .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:18px 0}
-    .line{display:flex;justify-content:space-between;border-bottom:1px solid #bbb;padding:8px 0}
-    .amount{font-size:22px;font-weight:700}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:55px;text-align:center}
-    .sign div{padding-top:35px;border-top:1px dotted #333}.cheque{width:190mm;height:82mm;border:1px dashed #999;padding:12mm;position:relative}
+    h1,h2,h3,p{margin:0}.cheque{width:190mm;height:82mm;border:1px dashed #999;padding:12mm;position:relative}
     .cheque .date{text-align:right}.cheque .payee{font-size:20px;margin-top:18px}.cheque .num{position:absolute;right:12mm;top:42mm;font-size:22px;font-weight:700}
     .note{font-size:11px;color:#666;margin-top:8px}
     .preview-toolbar{position:sticky;top:0;z-index:99;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;background:#17212b;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15)}
@@ -1856,28 +1852,30 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       @page{size:A4 portrait;margin:10mm}
       html,body{margin:0;padding:0}
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000;font-size:10.5px}
-      .pv-page{box-sizing:border-box;width:190mm;height:277mm;border:1.2px solid #000;padding:8mm;display:flex;flex-direction:column;overflow:hidden}
-      .pv-head{position:relative;display:grid;grid-template-columns:1.45fr .9fr .9fr;align-items:start;gap:10px;border-bottom:1px solid #000;padding-bottom:7px}
-      .company{font-size:10.5px;line-height:1.45}.company b{font-size:12px}
-      .title{position:absolute;left:50%;top:0;transform:translateX(-50%);text-align:center;white-space:nowrap}.title h1{font-size:22px;margin:0;line-height:1.1}.title b{font-size:10px}
-      .meta{display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center}.meta span{font-weight:700}.meta b{border-bottom:1px solid #000;padding:1px 4px;text-align:right}
-      .party{display:grid;grid-template-columns:135px 1fr;border-bottom:1px solid #000}.party div{padding:6px 7px}.party .label{font-weight:700;border-right:1px solid #000}
-      .payment-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid #000}
-      .payment-row div{padding:6px 7px;border-right:1px solid #000}.payment-row div:last-child{border-right:0}
-      table{width:100%;border-collapse:collapse}
-      .items{margin-top:8px}.items th,.items td{border:1px solid #000;padding:6px;vertical-align:top}
-      .items th{background:#f4f4f4;text-align:center}.num{text-align:right;white-space:nowrap}
-      .summary{width:48%;margin:8px 0 0 auto}.summary td{border:1px solid #000;padding:6px}.summary td:last-child{text-align:right;font-weight:700}
-      .spacer{flex:1 1 auto;min-height:6mm}
-      .explain{border:1px solid #000;padding:8px;margin-top:8px;min-height:24mm}
-      .sign{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #000;border-right:0;margin-top:8px}
-      .sign .cell{border-right:1px solid #000;text-align:center;min-height:38mm;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
-      .pv-page .sign .cell>div{border-top:0!important;padding-top:0!important}
-      .sign .role{font-weight:700}.sign .date{font-size:9px}
-      .warning{margin-top:7px;border:1px solid #a33;color:#a33;padding:6px;font-weight:700}
-      .foot{font-size:8.5px;color:#333;margin-top:5px;padding-bottom:2mm}
+      .pv-page{box-sizing:border-box;width:190mm;height:277mm;border:1px solid #000;padding:7mm;display:flex;flex-direction:column;font-size:10px;line-height:1.3}
+      .pv-page *{box-sizing:border-box}
+      .pv-page .pv-head{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;min-height:25mm;border-bottom:1px solid #000;padding-bottom:3mm}
+      .pv-page .company{max-width:55mm;font-size:9px;line-height:1.35;overflow-wrap:anywhere}.pv-page .company b{font-size:11px}
+      .pv-page .title{position:absolute;left:50%;top:0;transform:translateX(-50%);width:58mm;text-align:center;white-space:nowrap}.pv-page .title h1{font-size:20px;line-height:1.1}.pv-page .title b{font-size:10px}
+      .pv-page .meta{justify-self:end;display:grid;grid-template-columns:auto 1fr;gap:4px 5px;align-items:center;width:43mm;font-size:9px}.pv-page .meta span{font-weight:700}.pv-page .meta b{border-bottom:1px solid #000;padding:1px 2px;text-align:right}
+      .pv-page .party{display:grid;grid-template-columns:35mm 1fr;border-bottom:1px solid #000}.pv-page .party div{padding:4px 6px}.pv-page .party .label{font-weight:700;border-right:1px solid #000}
+      .pv-page .payment-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid #000}
+      .pv-page .payment-row div{min-width:0;padding:4px 6px;border-right:1px solid #000;overflow-wrap:anywhere}.pv-page .payment-row div:last-child{border-right:0}
+      .pv-page table{width:100%;border-collapse:collapse}
+      .pv-page .items{margin-top:3mm;table-layout:fixed}.pv-page .items th,.pv-page .items td{border:1px solid #000;padding:4px;vertical-align:top;overflow-wrap:anywhere}
+      .pv-page .items th{background:#f4f4f4;text-align:center}.pv-page .num{text-align:right;white-space:nowrap}
+      .pv-page .summary{width:48%;margin:3mm 0 0 auto}.pv-page .summary td{border:1px solid #000;padding:4px}.pv-page .summary td:last-child{text-align:right;font-weight:700}
+      .pv-page .pv-bottom{margin-top:auto;padding-top:3mm;flex-shrink:0}
+      .pv-page .explain{border:1px solid #000;padding:6px;min-height:19mm;overflow-wrap:anywhere}
+      .pv-page .sign{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #000;border-right:0;margin-top:3mm}
+      .pv-page .sign .cell{border-right:1px solid #000;text-align:center;min-height:30mm;padding:5px;display:flex;flex-direction:column;justify-content:flex-end;gap:3px}
+      .pv-page .sign .role{font-weight:700}.pv-page .sign .date{font-size:9px}
+      .pv-page .warning{margin-top:2mm;border:1px solid #a33;color:#a33;padding:4px;font-weight:700}
+      .pv-page .foot{font-size:8.5px;color:#333;margin-top:2mm}
+      .pv-page.pv-dense .items th,.pv-page.pv-dense .items td{padding:2px 3px;font-size:9px}
+      .pv-page.pv-dense .explain{min-height:15mm}.pv-page.pv-dense .sign .cell{min-height:26mm}
     </style>
-    <div class="pv-page">
+    <div class="pv-page${voucherExpenses.length>4?' pv-dense':''}">
       <div class="pv-head">
         <div class="company"><b>${company?.legal_name||'Sea Mountain'}</b><br>${company?.address||''}<br>เลขประจำตัวผู้เสียภาษี ${company?.tax_id||'-'}${company?.phone? `<br>โทร. ${company.phone}`:''}</div>
         <div class="title"><h1>ใบสำคัญจ่าย</h1><b>PAYMENT VOUCHER</b></div>
@@ -1895,11 +1893,11 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <div class="payment-row">
         <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
         <div><b>จำนวนบิล:</b> ${voucherExpenses.length || 1} รายการ</div>
-        <div><b>อ้างอิง:</b> ${voucherExpenses.map((x)=>x.expense_no).join(', ') || '-'}</div>
+        <div><b>เลขที่ใบวางบิล / Billing Note No.:</b> ................................</div>
       </div>
 
       <table class="items">
-        <thead><tr><th style="width:8%">วันที่</th><th style="width:14%">เลขเอกสาร</th><th>รายละเอียด</th><th style="width:14%">ยอดงวดนี้</th><th style="width:12%">หัก ณ ที่จ่าย</th><th style="width:14%">จ่ายสุทธิ</th></tr></thead>
+        <thead><tr><th style="width:12%">วันที่</th><th style="width:14%">เลขเอกสาร</th><th>รายละเอียด</th><th style="width:14%">ยอดงวดนี้</th><th style="width:12%">หัก ณ ที่จ่าย</th><th style="width:14%">จ่ายสุทธิ</th></tr></thead>
         <tbody>${(voucherExpenses.length?voucherExpenses:[e]).filter(Boolean).map((item)=>{const a=allocationMap[item.id]||{};return `<tr>
           <td>${thaiDate(item?.expense_date)}</td>
           <td>${item?.document_no||item?.expense_no||'-'}</td>
@@ -1918,8 +1916,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
 
       ${v.payment_method==='CHEQUE' && (!v.cheque_no || !v.bank_name) ? '<div class="warning">ข้อมูลเช็คยังไม่ครบ — กรุณาระบุธนาคารและเลขที่เช็คก่อนใช้เอกสารฉบับนี้จริง</div>' : ''}
 
-      <div class="spacer"></div>
-
+      <div class="pv-bottom">
       <div class="explain"><b>คำอธิบาย / Explanation</b><br>${v.notes||voucherExpenses.map((x)=>x.description).join(' / ')||e?.description||'-'}</div>
 
       <div class="sign">
@@ -1929,6 +1926,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         <div class="cell"><div class="role">ผู้รับเงิน / Received By</div><div>........................................</div><div class="date">วันที่ ....../....../......</div></div>
       </div>
       <div class="foot">${company?.legal_name||'Sea Mountain'} — Payment Voucher ${v.voucher_no}</div>
+      </div>
     </div>`);
   }
 
@@ -2053,35 +2051,35 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     printDocument(v.wht_certificate_no||'50 ทวิ',
       `<style>
         @page{size:A4 portrait;margin:8mm}
-        body{font-family:Arial,"Noto Sans Thai",sans-serif;font-size:10px}
-        .wht-standard{box-sizing:border-box;min-height:277mm;page-break-after:always;color:#000;padding:0 1mm}
-        .wht-copy{font-size:9px;margin:0 0 2px 2px;line-height:1.25}
-        .wht-title{text-align:center;margin:1px 0 3px}
-        .wht-title h2{font-size:17px;margin:0;line-height:1.05}.wht-title h3{font-size:10.5px;margin:1px 0}
-        .wht-book{display:flex;justify-content:flex-end;gap:22px;margin:-2px 4px 2px 0;font-size:9px}
-        .wht-box{border:1px solid #000;padding:4px 6px;margin-top:-1px}
-        .party-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-        .tax-id-row{display:flex;align-items:center;gap:5px;font-size:8.5px;white-space:nowrap}
-        .tax-boxes{display:inline-flex}
-        .tax-box{width:4.7mm;height:4.7mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:9px;box-sizing:border-box}
-        .tax-box:last-child{border-right:1px solid #000}
-        .wht-line{display:grid;grid-template-columns:36px 1fr;gap:6px;padding:2px 0;border-bottom:1px dotted #777}
-        .wht-line:last-child{border-bottom:0}
-        .wht-ref{border:1px solid #000;border-top:0;padding:4px 6px;display:flex;flex-wrap:wrap;gap:3px 10px;font-size:8.5px}
-        .wht-table{width:100%;border-collapse:collapse;font-size:8.2px;line-height:1.18}
-        .wht-table th,.wht-table td{border:1px solid #000;padding:3px 4px;vertical-align:top}
-        .wht-table th:nth-child(1){width:56%}.wht-table th:nth-child(2){width:14%}.wht-table th:nth-child(3),.wht-table th:nth-child(4){width:15%}
-        .wht-table td:nth-child(n+2){text-align:right;white-space:nowrap}
-        .wht-table .active-income td{font-weight:700}
-        .wht-total td{background:#f6f6f6}
-        .wht-funds{border:1px solid #000;border-top:0;padding:4px;font-size:8px}
-        .wht-payer{border:1px solid #000;border-top:0;padding:4px;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:8.5px}
-        .wht-bottom{display:grid;grid-template-columns:1fr 1.25fr;border:1px solid #000;border-top:0}
-        .wht-bottom .wht-warning{font-size:7.8px;padding:5px;margin:0;border-right:1px solid #000}
-        .wht-bottom .wht-certify{text-align:center;padding:5px;margin:0;font-size:8px}
-        .wht-sign{position:relative;width:54%;margin-left:auto;text-align:center;margin-top:6px;line-height:1.65;font-size:8.5px}
-        .stamp{position:absolute;left:-92px;top:1px;border:1px solid #000;border-radius:50%;width:58px;height:58px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7.5px}
-        @media print{.wht-standard:last-child{page-break-after:auto}}
+        .wht-standard{box-sizing:border-box;width:194mm;height:281mm;margin:0 auto;padding:3mm;border:1px solid #000;break-inside:avoid;break-after:page;display:flex;flex-direction:column;color:#000;font:9px/1.25 Arial,"Noto Sans Thai",sans-serif}
+        .wht-standard *{box-sizing:border-box}
+        .wht-standard .wht-copy{font-size:8px;margin-bottom:1mm}
+        .wht-standard .wht-title{text-align:center;margin:0 0 1.5mm}
+        .wht-standard .wht-title h2{font-size:17px;line-height:1.1}.wht-standard .wht-title h3{font-size:10px;margin-top:1mm}
+        .wht-standard .wht-book{display:flex;justify-content:flex-end;gap:12mm;margin-bottom:1.5mm;font-size:9px}
+        .wht-standard .wht-box{border:1px solid #000;padding:1.5mm 2mm;margin-top:-1px}
+        .wht-standard .party-head{display:flex;justify-content:space-between;align-items:center;gap:2mm}
+        .wht-standard .tax-id-row{display:flex;align-items:center;gap:1mm;font-size:8px;white-space:nowrap}
+        .wht-standard .tax-boxes{display:inline-flex}
+        .wht-standard .tax-box{width:4.2mm;height:4.6mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:9px}
+        .wht-standard .tax-box:last-child{border-right:1px solid #000}
+        .wht-standard .wht-line{display:grid;grid-template-columns:11mm 1fr;gap:1mm;padding:1.5mm 0;border-bottom:1px dotted #777}
+        .wht-standard .wht-line:last-child{border-bottom:0}
+        .wht-standard .wht-ref{border:1px solid #000;border-top:0;padding:1.5mm 2mm;display:flex;flex-wrap:wrap;gap:1mm 4mm;font-size:8px}
+        .wht-standard .wht-table{width:100%;height:100mm;border-collapse:collapse;table-layout:fixed;font-size:8.2px;line-height:1.2}
+        .wht-standard .wht-table th,.wht-standard .wht-table td{border:1px solid #000;padding:1.5mm;vertical-align:top;overflow-wrap:anywhere}
+        .wht-standard .wht-table th:nth-child(1){width:54%}.wht-standard .wht-table th:nth-child(2){width:16%}.wht-standard .wht-table th:nth-child(3),.wht-standard .wht-table th:nth-child(4){width:15%}
+        .wht-standard .wht-table td:nth-child(n+2){text-align:right;white-space:nowrap}
+        .wht-standard .wht-table .active-income td{font-weight:700}
+        .wht-standard .wht-table .wht-total td{background:#f6f6f6}
+        .wht-standard .wht-funds{border:1px solid #000;border-top:0;padding:1.5mm 2mm;font-size:7.5px}
+        .wht-standard .wht-payer{border:1px solid #000;border-top:0;padding:1.5mm 2mm;display:flex;flex-wrap:wrap;gap:1mm 4mm;font-size:8px}
+        .wht-standard .wht-bottom{display:grid;grid-template-columns:1fr 1.25fr;border:1px solid #000;border-top:0;margin-top:auto;min-height:19mm}
+        .wht-standard .wht-bottom .wht-warning{font-size:8px;padding:2mm;border-right:1px solid #000}
+        .wht-standard .wht-bottom .wht-certify{text-align:center;padding:2mm;font-size:8px}
+        .wht-standard .wht-sign{position:relative;width:54%;margin:2mm 0 0 auto;text-align:center;line-height:1.55;font-size:8.5px;min-height:24mm}
+        .wht-standard .stamp{position:absolute;left:-24mm;top:0;border:1px solid #000;border-radius:50%;width:16mm;height:16mm;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7px}
+        @media print{.wht-standard:last-child{break-after:auto}}
       </style>` +
       copy(1,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี') +
       copy(2,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย เก็บไว้เป็นหลักฐาน')
