@@ -2238,67 +2238,121 @@ function PurchaseOrderPanel({ vendors }) {
 
   function printPo(){
     const validItems=items.filter((row)=>row.description.trim() || Number(row.qty||0) || Number(row.unit_price||0));
+    const logoUrl='/sea-mountain-logo.png';
     printDocument(form.po_no||'Purchase Order',`<style>
-      @page{size:A4 portrait;margin:10mm}
+      @page{size:A4 portrait;margin:7mm}
       html,body{margin:0;padding:0}
-      body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000}
-      .po-page{box-sizing:border-box;width:190mm;min-height:277mm;border:1px solid #000;padding:8mm;display:flex;flex-direction:column;font-size:10px;line-height:1.3}
-      .po-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;border-bottom:1.5px solid #000;padding-bottom:4mm}
-      .po-company{font-size:9px;line-height:1.35}.po-company b{font-size:12px}
-      .po-title{text-align:center;min-width:60mm}.po-title h1{font-size:22px;line-height:1;margin:0}.po-title b{font-size:11px}
-      .po-meta{justify-self:end;display:grid;grid-template-columns:auto 1fr;gap:4px 6px;min-width:48mm}.po-meta span{font-weight:700}.po-meta b{border-bottom:1px solid #000;padding:1px 3px;text-align:right}
-      .po-info{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #000}
-      .po-info>div{padding:4px 6px}.po-info>div:nth-child(odd){border-right:1px solid #000}
-      .po-info .wide{grid-column:1/-1;border-right:0}
+      body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111}
+      .po-page{box-sizing:border-box;width:196mm;height:283mm;border:1px solid #222;padding:5.5mm;display:flex;flex-direction:column;font-size:9.5px;line-height:1.28}
+      .po-head{display:grid;grid-template-columns:40mm 1fr 54mm;gap:4mm;align-items:start;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
+      .po-brand{display:grid;grid-template-columns:25mm 1fr;gap:3mm;align-items:start}
+      .po-logo{width:25mm;height:19mm;object-fit:contain;display:block}
+      .po-company{font-size:8.4px;line-height:1.28;overflow-wrap:anywhere}
+      .po-company b{font-size:10px}.po-company .brand-sub{font-size:7.7px;font-weight:700}
+      .po-title{text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
+      .po-meta{justify-self:end;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2.2mm 3mm;align-items:center;padding-top:2mm}
+      .po-meta span{font-weight:700}.po-meta b{border-bottom:1px solid #111;padding:0 1mm 1mm;text-align:right;font-size:10px}
+      .supplier-box{border:1px solid #111;border-radius:2mm;margin-top:4mm;overflow:hidden}
+      .supplier-title{background:#f0f0f0;padding:2mm 3mm;font-weight:800;font-size:10.5px}
+      .supplier-body{display:grid;grid-template-columns:1fr 54mm}
+      .supplier-main{padding:2.5mm 3mm;display:grid;grid-template-columns:30mm 1fr;row-gap:1.7mm}
+      .supplier-main b{font-weight:700}.supplier-side{border-left:1px solid #111;padding:2.5mm 3mm;display:flex;flex-direction:column;gap:2mm}
+      .supplier-side .tax{font-size:9.5px}.supplier-side .vat{border-top:1px solid #888;padding-top:2mm;font-weight:700}
       .po-items{width:100%;border-collapse:collapse;margin-top:4mm;table-layout:fixed}
-      .po-items th,.po-items td{border:1px solid #000;padding:5px;vertical-align:top}
-      .po-items th{text-align:center;background:#f4f4f4}
-      .po-items .num{text-align:right;white-space:nowrap}
-      .po-summary{width:46%;margin:4mm 0 0 auto;border-collapse:collapse}
-      .po-summary td{border:1px solid #000;padding:5px}.po-summary td:last-child{text-align:right;font-weight:700}
-      .po-words{margin-top:3mm;border:1px solid #000;padding:5px;font-weight:700}
-      .po-remark{margin-top:auto;border:1px solid #000;min-height:24mm;padding:6px}
-      .po-sign{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #000;border-right:0;margin-top:4mm}
-      .po-sign>div{border-right:1px solid #000;text-align:center;min-height:28mm;padding:5px;display:flex;flex-direction:column;justify-content:flex-end}
-      .po-foot{font-size:8px;margin-top:2mm;color:#444}
+      .po-items th,.po-items td{border:1px solid #111;padding:2.5mm 2mm;vertical-align:middle}
+      .po-items th{text-align:center;background:#f0f0f0;font-size:9px;line-height:1.2}
+      .po-items td{font-size:9.2px}.po-items .num{text-align:right;white-space:nowrap}
+      .po-summary{width:48%;margin:4mm 0 0 auto;border-collapse:collapse}
+      .po-summary td{border:1px solid #111;padding:2.5mm 3mm;font-size:9.5px}.po-summary td:last-child{text-align:right;font-weight:700}
+      .po-summary tr:last-child td{font-weight:800;font-size:10px}
+      .po-words{display:grid;grid-template-columns:42mm 1fr;margin-top:4mm;border:1px solid #111;min-height:11mm;align-items:center}
+      .po-words .label{background:#f0f0f0;height:100%;display:flex;align-items:center;padding:2mm 3mm;font-weight:700;line-height:1.2}
+      .po-words .value{padding:2mm 4mm;font-weight:800;font-size:11px}
+      .po-remark{margin-top:auto;border:1px solid #111;min-height:28mm}
+      .po-remark .head{background:#f0f0f0;padding:2mm 3mm;font-weight:800;font-size:10px}
+      .po-remark .body{padding:3mm;white-space:pre-wrap}
+      .po-sign{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #111;border-right:0;margin-top:4mm}
+      .po-sign>div{border-right:1px solid #111;text-align:center;min-height:29mm;padding:3mm;display:flex;flex-direction:column;justify-content:flex-end;gap:3mm}
+      .po-sign b{font-size:9.5px}
+      .po-foot{display:flex;justify-content:space-between;border-top:1px solid #888;font-size:7.5px;margin-top:3mm;padding-top:1.5mm;color:#333}
     </style>
     <div class="po-page">
       <div class="po-head">
-        <div class="po-company"><b>${company?.legal_name||'Sea Mountain'}</b><br>${company?.address||''}<br>เลขประจำตัวผู้เสียภาษี ${company?.tax_id||'-'}${company?.phone?`<br>โทร. ${company.phone}`:''}</div>
+        <div class="po-brand">
+          <img class="po-logo" src="${logoUrl}" alt="Sea Mountain logo">
+          <div class="po-company">
+            <b>${company?.legal_name||'Sea Mountain'}</b><br>
+            <span class="brand-sub">Sea Mountain Zipline & ATV Adventure</span><br>
+            ${company?.address||''}<br>
+            เลขประจำตัวผู้เสียภาษี: ${company?.tax_id||'-'}<br>
+            โทร.: ${company?.phone||'-'}
+          </div>
+        </div>
         <div class="po-title"><h1>ใบสั่งซื้อ</h1><b>PURCHASE ORDER</b></div>
-        <div class="po-meta"><span>เลขที่</span><b>${form.po_no||'-'}</b><span>วันที่</span><b>${thaiDate(form.po_date)}</b></div>
+        <div class="po-meta">
+          <span>เลขที่ / PO No.</span><b>${form.po_no||'-'}</b>
+          <span>วันที่ / Date</span><b>${thaiDate(form.po_date)}</b>
+        </div>
       </div>
 
-      <div class="po-info">
-        <div><b>ผู้ขาย / Supplier:</b> ${form.supplier_name||'-'}</div>
-        <div><b>Tax ID:</b> ${form.supplier_tax_id||'-'}</div>
-        <div class="wide"><b>ที่อยู่:</b> ${form.supplier_address||'-'}</div>
-        <div><b>โทร:</b> ${form.supplier_phone||'-'}</div>
-        <div><b>กำหนดส่ง:</b> ${form.delivery_date?thaiDate(form.delivery_date):'-'}</div>
-        <div><b>เงื่อนไขการชำระ:</b> ${form.payment_term||'-'}</div>
-        <div><b>VAT:</b> ${Number(form.vat_rate||0)}%</div>
+      <div class="supplier-box">
+        <div class="supplier-title">ผู้ขาย / Supplier</div>
+        <div class="supplier-body">
+          <div class="supplier-main">
+            <b>ชื่อผู้ขาย / Supplier Name</b><div>${form.supplier_name||'-'}</div>
+            <b>ที่อยู่ / Address</b><div>${form.supplier_address||'-'}</div>
+            <b>โทร. / Tel.</b><div>${form.supplier_phone||'-'}</div>
+            <b>เงื่อนไขการชำระ / Payment Terms</b><div>${form.payment_term||'-'}</div>
+            <b>กำหนดส่ง / Delivery Date</b><div>${form.delivery_date?thaiDate(form.delivery_date):'-'}</div>
+          </div>
+          <div class="supplier-side">
+            <div class="tax"><b>เลขประจำตัวผู้เสียภาษี / Tax ID</b><br>${form.supplier_tax_id||'-'}</div>
+            <div class="vat">VAT : ${Number(form.vat_rate||0)}%</div>
+          </div>
+        </div>
       </div>
 
       <table class="po-items">
-        <thead><tr><th style="width:8%">ลำดับ</th><th>รายละเอียด</th><th style="width:12%">หน่วย</th><th style="width:12%">จำนวน</th><th style="width:16%">ราคาต่อหน่วย</th><th style="width:18%">จำนวนเงิน</th></tr></thead>
-        <tbody>${validItems.map((row,index)=>`<tr><td style="text-align:center">${index+1}</td><td>${row.description||'-'}</td><td style="text-align:center">${row.unit||'-'}</td><td class="num">${Number(row.qty||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td class="num">${money(row.unit_price)}</td><td class="num"><b>${money(Number(row.qty||0)*Number(row.unit_price||0))}</b></td></tr>`).join('')}</tbody>
+        <thead><tr>
+          <th style="width:8%">ลำดับ<br>No.</th>
+          <th>รายละเอียด<br>Description</th>
+          <th style="width:12%">หน่วย<br>Unit</th>
+          <th style="width:12%">จำนวน<br>Qty.</th>
+          <th style="width:17%">ราคาต่อหน่วย<br>Unit Price</th>
+          <th style="width:18%">จำนวนเงิน<br>Amount</th>
+        </tr></thead>
+        <tbody>${validItems.map((row,index)=>`<tr>
+          <td style="text-align:center">${index+1}</td>
+          <td>${row.description||'-'}</td>
+          <td style="text-align:center">${row.unit||'-'}</td>
+          <td class="num">${Number(row.qty||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          <td class="num">${money(row.unit_price)}</td>
+          <td class="num"><b>${money(Number(row.qty||0)*Number(row.unit_price||0))}</b></td>
+        </tr>`).join('')}</tbody>
       </table>
 
       <table class="po-summary">
-        <tr><td>ยอดรวม</td><td>${money(subtotal)}</td></tr>
+        <tr><td>ยอดรวม / Subtotal</td><td>${money(subtotal)}</td></tr>
         <tr><td>VAT ${Number(form.vat_rate||0)}%</td><td>${money(vat)}</td></tr>
-        <tr><td><b>ยอดสุทธิ</b></td><td><b>${money(grandTotal)}</b></td></tr>
+        <tr><td>ยอดสุทธิ / Grand Total</td><td>${money(grandTotal)}</td></tr>
       </table>
-      <div class="po-words">(${thaiBahtText(grandTotal)})</div>
 
-      <div class="po-remark"><b>หมายเหตุ / Remark</b><br>${form.remark||'-'}</div>
+      <div class="po-words">
+        <div class="label">จำนวนเงินเป็นตัวอักษร /<br>Amount in Words</div>
+        <div class="value">(${thaiBahtText(grandTotal)})</div>
+      </div>
+
+      <div class="po-remark">
+        <div class="head">หมายเหตุ / Remark</div>
+        <div class="body">${form.remark||'-'}</div>
+      </div>
 
       <div class="po-sign">
-        <div><b>ผู้จัดทำ / Prepared By</b><br><br>........................................</div>
-        <div><b>ผู้ตรวจสอบ / Checked By</b><br><br>........................................</div>
-        <div><b>ผู้อนุมัติ / Approved By</b><br><br>........................................</div>
+        <div><b>ผู้จัดทำ / Prepared By</b><div>........................................</div></div>
+        <div><b>ผู้ตรวจสอบ / Checked By</b><div>........................................</div></div>
+        <div><b>ผู้อนุมัติ / Approved By</b><div>........................................</div></div>
       </div>
-      <div class="po-foot">${company?.legal_name||'Sea Mountain'} — ${form.po_no||''}</div>
+      <div class="po-foot"><span>${company?.legal_name||'Sea Mountain'} / Sea Mountain Zipline & ATV Adventure</span><span>${form.po_no||''}</span></div>
     </div>`);
   }
 
