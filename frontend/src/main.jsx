@@ -2238,7 +2238,7 @@ function PurchaseOrderPanel({ vendors }) {
 
   function printPo(){
     const validItems=items.filter((row)=>row.description.trim() || Number(row.qty||0) || Number(row.unit_price||0));
-    const logoUrl=`${window.location.origin}/sea-mountain-logo.png`;
+    const logoUrl=`${window.location.origin}/sea-mountain-logo.svg`;
     printDocument(form.po_no||'Purchase Order',`<style>
       @page{size:A4 portrait;margin:7mm}
       html,body{margin:0;padding:0}
