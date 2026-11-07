@@ -1946,9 +1946,13 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         },0)
       : Number(v.gross_amount||0);
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
-    const incomeLabel=v.income_type||voucherExpenses.map((item)=>item.description).join(' / ')||e?.description||'อื่น ๆ';
+    const incomeLabel=v.income_type||voucherExpenses.map((item)=>item.description).join(' / ')||e?.description||'';
     const serviceContext=[incomeLabel,...voucherExpenses.map((item)=>item.description||''),...voucherExpenses.map((item)=>item.cost_code_name||item.cost_code||'')].join(' ');
-    const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง|ก่อสร้าง|ซ่อม|ทาสี|มุงหลังคา|ติดตั้ง|ปรับปรุง|ประปา|ไฟฟ้า|โครงสร้าง|งาน/i.test(serviceContext);
+    const explicitOther=/^อื่น\s*ๆ|^อื่นๆ|^other\b/i.test(String(v.income_type||'').trim());
+    const isService=!explicitOther && (
+      Number(v.withholding_tax||0) > 0 ||
+      /บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง|ก่อสร้าง|ซ่อม|ทาสี|มุงหลังคา|ติดตั้ง|ปรับปรุง|ประปา|ไฟฟ้า|โครงสร้าง|งาน/i.test(serviceContext)
+    );
     const rowAmount=(active)=>active ? money(base) : '';
     const rowTax=(active)=>active ? money(v.withholding_tax) : '';
     const rowDate=(active)=>active ? thaiDate(v.voucher_date) : '';
