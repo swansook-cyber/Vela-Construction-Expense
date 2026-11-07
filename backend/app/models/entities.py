@@ -108,6 +108,7 @@ class PaymentVoucher(Base):
     cheque_no: Mapped[str | None] = mapped_column(String(80), nullable=True)
     cheque_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     bank_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    billing_note_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="ISSUED")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
