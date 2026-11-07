@@ -1493,6 +1493,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
     cheque_no: '',
     cheque_date: today(),
     bank_name: 'ธนาคารไทยพาณิชย์',
+    billing_note_no: '',
     notes: '',
   });
   const [error, setError] = useState('');
@@ -1562,6 +1563,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           cheque_no: form.payment_method === 'CHEQUE' ? (form.cheque_no || null) : null,
           cheque_date: form.payment_method === 'CHEQUE' ? form.cheque_date : null,
           bank_name: form.payment_method === 'CHEQUE' ? (form.bank_name || null) : null,
+          billing_note_no: form.billing_note_no?.trim() || null,
           notes: form.notes || null,
         })
       });
@@ -1629,7 +1631,8 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           <span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span>
           <span className="total-line">ยอดเช็ค / จ่ายสุทธิ <b>{money(net)}</b></span>
         </div>
-        <label className="wide">หมายเหตุ / เลขใบวางบิล<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} placeholder="เช่น งวดที่ 1 / ใบวางบิลเลขที่ ..." /></label>
+        <label>เลขที่ใบวางบิล<input value={form.billing_note_no} onChange={(e)=>set('billing_note_no',e.target.value)} placeholder="เช่น BL-2026-001" /></label>
+        <label className="wide">หมายเหตุ<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} placeholder="หมายเหตุเพิ่มเติม" /></label>
         {error && <div className="error wide">{error}</div>}
         <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button disabled={!vendor || allocations.length===0}>ออกใบสำคัญจ่าย</button></div>
       </form>
@@ -1644,6 +1647,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
     bank_name:voucher.bank_name||'ธนาคารไทยพาณิชย์',
     cheque_no:voucher.cheque_no||'',
     cheque_date:voucher.cheque_date||today(),
+    billing_note_no:voucher.billing_note_no||'',
     notes:voucher.notes||''
   });
   const [error,setError]=useState('');
@@ -1658,6 +1662,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
           bank_name:form.payment_method==='CHEQUE'?(form.bank_name||null):null,
           cheque_no:form.payment_method==='CHEQUE'?(form.cheque_no||null):null,
           cheque_date:form.payment_method==='CHEQUE'?form.cheque_date:null,
+          billing_note_no:form.billing_note_no?.trim()||null,
           notes:form.notes||null
         })
       });
@@ -1681,6 +1686,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
           <label>เลขที่เช็ค<input value={form.cheque_no} onChange={(e)=>set('cheque_no',e.target.value)} required /></label>
           <label>วันที่เช็ค<input type="date" value={form.cheque_date} onChange={(e)=>set('cheque_date',e.target.value)} required /></label>
         </>}
+        <label>เลขที่ใบวางบิล<input value={form.billing_note_no} onChange={(e)=>set('billing_note_no',e.target.value)} /></label>
         <label className="wide">หมายเหตุ<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} /></label>
         {error&&<div className="error wide">{error}</div>}
         <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button>บันทึกการจ่าย</button></div>
@@ -1893,7 +1899,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <div class="payment-row">
         <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
         <div><b>จำนวนบิล:</b> ${voucherExpenses.length || 1} รายการ</div>
-        <div><b>เลขที่ใบวางบิล / Billing Note No.:</b> ................................</div>
+        <div><b>เลขที่ใบวางบิล / Billing Note No.:</b> ${v.billing_note_no||'-'}</div>
       </div>
 
       <table class="items">
