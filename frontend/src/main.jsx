@@ -2257,7 +2257,7 @@ function PurchaseOrderPanel({ vendors }) {
       .po-brand{display:grid;grid-template-columns:30mm minmax(0,1fr);gap:3.5mm;align-items:start}
       .po-logo{width:27mm;height:22mm;display:block}.po-logo svg{width:100%;height:100%;display:block}
       .po-company{font-size:9px;line-height:1.3;overflow-wrap:normal;word-break:normal}
-      .po-company b{font-size:11px}.po-company .brand-sub{font-size:8.2px;font-weight:700}
+      .po-company b{font-size:11px}
       .po-title{text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
       .po-meta{justify-self:end;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2.2mm 3mm;align-items:center;padding-top:2mm}
       .po-meta span{font-weight:700}.po-meta b{border-bottom:1px solid #111;padding:0 1mm 1mm;text-align:right;font-size:10px}
@@ -2291,7 +2291,6 @@ function PurchaseOrderPanel({ vendors }) {
           <div class="po-logo">${logoSvg}</div>
           <div class="po-company">
             <b>${company?.legal_name||'Sea Mountain'}</b><br>
-            <span class="brand-sub">Sea Mountain Zipline & ATV Adventure</span><br>
             ${company?.address||''}<br>
             เลขประจำตัวผู้เสียภาษี: ${company?.tax_id||'-'}<br>
             โทร.: ${company?.phone||'-'}
@@ -2361,7 +2360,7 @@ function PurchaseOrderPanel({ vendors }) {
         <div><b>ผู้ตรวจสอบ / Checked By</b><div>........................................</div></div>
         <div><b>ผู้อนุมัติ / Approved By</b><div>........................................</div></div>
       </div>
-      <div class="po-foot"><span>${company?.legal_name||'Sea Mountain'} / Sea Mountain Zipline & ATV Adventure</span><span>${form.po_no||''}</span></div>
+      <div class="po-foot"><span>${company?.legal_name||'Sea Mountain'}</span><span>${form.po_no||''}</span></div>
     </div>`);
   }
 
