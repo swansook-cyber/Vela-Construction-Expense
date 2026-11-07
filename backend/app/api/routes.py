@@ -530,6 +530,7 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
             "net_amount": str(net_amount),
             "wht_certificate_no": voucher.wht_certificate_no,
             "cheque_no": voucher.cheque_no,
+            "billing_note_no": voucher.billing_note_no,
         },
     )
     db.commit()
@@ -549,6 +550,7 @@ def update_payment_voucher_payment(voucher_id: int, payload: PaymentVoucherPayme
     voucher.cheque_no = payload.cheque_no if payload.payment_method == "CHEQUE" else None
     voucher.cheque_date = payload.cheque_date if payload.payment_method == "CHEQUE" else None
     voucher.bank_name = payload.bank_name if payload.payment_method == "CHEQUE" else None
+    voucher.billing_note_no = payload.billing_note_no
     voucher.notes = payload.notes
     voucher.updated_at = datetime.utcnow()
     add_audit(db, "payment_voucher", voucher.id, "UPDATE_PAYMENT", {
