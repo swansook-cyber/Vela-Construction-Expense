@@ -2238,16 +2238,16 @@ function PurchaseOrderPanel({ vendors }) {
 
   function printPo(){
     const validItems=items.filter((row)=>row.description.trim() || Number(row.qty||0) || Number(row.unit_price||0));
-    const logoUrl='/sea-mountain-logo.png';
+    const logoUrl=`${window.location.origin}/sea-mountain-logo.png`;
     printDocument(form.po_no||'Purchase Order',`<style>
       @page{size:A4 portrait;margin:7mm}
       html,body{margin:0;padding:0}
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111}
       .po-page{box-sizing:border-box;width:196mm;height:283mm;border:1px solid #222;padding:5.5mm;display:flex;flex-direction:column;font-size:9.5px;line-height:1.28}
-      .po-head{display:grid;grid-template-columns:40mm 1fr 54mm;gap:4mm;align-items:start;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
-      .po-brand{display:grid;grid-template-columns:25mm 1fr;gap:3mm;align-items:start}
-      .po-logo{width:25mm;height:19mm;object-fit:contain;display:block}
-      .po-company{font-size:8.4px;line-height:1.28;overflow-wrap:anywhere}
+      .po-head{display:grid;grid-template-columns:72mm 54mm 52mm;gap:4mm;align-items:start;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
+      .po-brand{display:grid;grid-template-columns:27mm minmax(0,1fr);gap:3mm;align-items:start}
+      .po-logo{width:27mm;height:22mm;object-fit:contain;display:block}
+      .po-company{font-size:8.2px;line-height:1.28;overflow-wrap:normal;word-break:normal}
       .po-company b{font-size:10px}.po-company .brand-sub{font-size:7.7px;font-weight:700}
       .po-title{text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
       .po-meta{justify-self:end;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2.2mm 3mm;align-items:center;padding-top:2mm}
