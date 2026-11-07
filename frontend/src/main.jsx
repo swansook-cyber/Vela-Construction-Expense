@@ -2238,35 +2238,26 @@ function PurchaseOrderPanel({ vendors }) {
 
   function printPo(){
     const validItems=items.filter((row)=>row.description.trim() || Number(row.qty||0) || Number(row.unit_price||0));
-    const logoSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 420" aria-label="Sea Mountain">
-      <defs><linearGradient id="pm" x1="0" x2="1"><stop offset="0" stop-color="#1f6f2a"/><stop offset="1" stop-color="#3f8f2d"/></linearGradient><linearGradient id="pw" x1="0" x2="1"><stop offset="0" stop-color="#0e8aa0"/><stop offset="1" stop-color="#005f8f"/></linearGradient></defs>
-      <g fill="none" stroke="#07345f" stroke-width="10" stroke-linecap="round"><path d="M85 190 A220 220 0 0 1 510 150"/><path d="M215 60 C330 70 405 105 505 145" stroke-width="4"/></g>
-      <path d="M105 245 L245 85 L300 145 L345 118 L475 250 Z" fill="url(#pm)"/><path d="M154 190 L245 100 L277 148 L300 130 L338 170 L312 156 L298 178 L276 152 L246 126 L216 165 Z" fill="#fff"/>
-      <path d="M70 275 C145 200 215 210 258 256 C225 233 197 240 181 260 C228 242 265 255 300 285 C230 272 170 290 90 305 Z" fill="url(#pw)"/><path d="M76 286 C150 225 216 238 246 270 C196 251 156 274 128 296" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
-      <path d="M265 295 C330 278 390 270 500 290" fill="none" stroke="#c58f32" stroke-width="12" stroke-linecap="round"/>
-      <g fill="#07345f"><circle cx="435" cy="244" r="18"/><circle cx="495" cy="244" r="18"/><rect x="432" y="215" width="62" height="20" rx="8"/><circle cx="461" cy="197" r="11"/><path d="M455 205 L443 218 L470 224 L484 210 L475 205 Z"/><circle cx="430" cy="118" r="10"/><path d="M424 127 L416 151 L436 166 L452 160 L438 143 L439 129 Z"/><path d="M438 145 L463 153 L474 169 L462 176 L448 158 Z"/><path d="M422 132 L445 116" stroke="#07345f" stroke-width="8" fill="none" stroke-linecap="round"/></g>
-      <text x="300" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="62" font-weight="900" font-style="italic"><tspan fill="#07345f">SEA </tspan><tspan fill="#167327">MOUNTAIN</tspan></text>
-      <text x="300" y="392" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="3" fill="#07345f">ZIPLINE &amp; ATV ADVENTURE</text>
-    </svg>`;
+    const logoUrl=new URL('/sea-mountain-adventure-logo.png',window.location.origin).href;
     printDocument(form.po_no||'Purchase Order',`<style>
       @page{size:A4 portrait;margin:7mm}
       html,body{margin:0;padding:0}
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111}
       .po-page{box-sizing:border-box;width:196mm;height:283mm;border:1px solid #222;padding:5.5mm;display:flex;flex-direction:column;font-size:9.5px;line-height:1.28}
-      .po-head{display:grid;grid-template-columns:72mm 54mm 52mm;gap:4mm;align-items:start;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
-      .po-brand{display:grid;grid-template-columns:30mm minmax(0,1fr);gap:3.5mm;align-items:start}
-      .po-logo{width:27mm;height:22mm;display:block}.po-logo svg{width:100%;height:100%;display:block}
-      .po-company{font-size:9px;line-height:1.3;overflow-wrap:normal;word-break:normal}
+      .po-head{position:relative;display:flex;justify-content:space-between;align-items:start;min-height:31mm;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
+      .po-brand{display:grid;grid-template-columns:35mm minmax(0,1fr);gap:3mm;align-items:start;width:78mm}
+      .po-logo{width:35mm;display:block}.po-logo img{display:block;width:100%;height:auto;object-fit:contain}
+      .po-company{font-size:9px;line-height:1.3;overflow-wrap:anywhere;word-break:normal}
       .po-company b{font-size:11px}
-      .po-title{text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
-      .po-meta{justify-self:end;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2.2mm 3mm;align-items:center;padding-top:2mm}
+      .po-title{position:absolute;left:50%;transform:translateX(-50%);width:45mm;text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
+      .po-meta{width:48mm;display:grid;grid-template-columns:auto 1fr;gap:2.2mm 3mm;align-items:center;padding-top:2mm}
       .po-meta span{font-weight:700}.po-meta b{border-bottom:1px solid #111;padding:0 1mm 1mm;text-align:right;font-size:10px}
       .supplier-box{border:1px solid #111;border-radius:2mm;margin-top:4mm;overflow:hidden}
       .supplier-title{background:#f0f0f0;padding:2mm 3mm;font-weight:800;font-size:10.5px}
-      .supplier-body{display:grid;grid-template-columns:1fr 54mm}
-      .supplier-main{padding:2.5mm 3mm;display:grid;grid-template-columns:30mm 1fr;row-gap:1.7mm}
-      .supplier-main b{font-weight:700}.supplier-side{border-left:1px solid #111;padding:2.5mm 3mm;display:flex;flex-direction:column;gap:2mm}
-      .supplier-side .tax{font-size:9.5px}.supplier-side .vat{border-top:1px solid #888;padding-top:2mm;font-weight:700}
+      .supplier-body{display:grid;grid-template-columns:minmax(0,1fr) 30mm}
+      .supplier-main{padding:2.5mm 3mm;display:grid;grid-template-columns:44mm minmax(0,1fr);row-gap:1.6mm;align-items:start}
+      .supplier-main b{font-weight:700}.supplier-main div{overflow-wrap:anywhere}.supplier-side{border-left:1px solid #111;padding:2.5mm;display:flex;align-items:center;justify-content:center}
+      .supplier-side .vat{font-weight:700;white-space:nowrap}
       .po-items{width:100%;border-collapse:collapse;margin-top:4mm;table-layout:fixed}
       .po-items th,.po-items td{border:1px solid #111;padding:2.5mm 2mm;vertical-align:middle}
       .po-items th{text-align:center;background:#f0f0f0;font-size:9px;line-height:1.2}
@@ -2288,10 +2279,10 @@ function PurchaseOrderPanel({ vendors }) {
     <div class="po-page">
       <div class="po-head">
         <div class="po-brand">
-          <div class="po-logo">${logoSvg}</div>
+          <div class="po-logo"><img src="${logoUrl}" alt="Sea Mountain Zipline &amp; ATV Adventure"></div>
           <div class="po-company">
-            <b>${company?.legal_name||'Sea Mountain'}</b><br>
-            ${company?.address||''}<br>
+            <b>${company?.legal_name||'-'}</b><br>
+            ${company?.address||'-'}<br>
             เลขประจำตัวผู้เสียภาษี: ${company?.tax_id||'-'}<br>
             โทร.: ${company?.phone||'-'}
           </div>
@@ -2310,11 +2301,11 @@ function PurchaseOrderPanel({ vendors }) {
             <b>ชื่อผู้ขาย / Supplier Name</b><div>${form.supplier_name||'-'}</div>
             <b>ที่อยู่ / Address</b><div>${form.supplier_address||'-'}</div>
             <b>โทร. / Tel.</b><div>${form.supplier_phone||'-'}</div>
+            <b>เลขประจำตัวผู้เสียภาษี / Tax ID</b><div>${form.supplier_tax_id||'-'}</div>
             <b>เงื่อนไขการชำระ / Payment Terms</b><div>${form.payment_term||'-'}</div>
             <b>กำหนดส่ง / Delivery Date</b><div>${form.delivery_date?thaiDate(form.delivery_date):'-'}</div>
           </div>
           <div class="supplier-side">
-            <div class="tax"><b>เลขประจำตัวผู้เสียภาษี / Tax ID</b><br>${form.supplier_tax_id||'-'}</div>
             <div class="vat">VAT : ${Number(form.vat_rate||0)}%</div>
           </div>
         </div>
@@ -2360,7 +2351,7 @@ function PurchaseOrderPanel({ vendors }) {
         <div><b>ผู้ตรวจสอบ / Checked By</b><div>........................................</div></div>
         <div><b>ผู้อนุมัติ / Approved By</b><div>........................................</div></div>
       </div>
-      <div class="po-foot"><span>${company?.legal_name||'Sea Mountain'}</span><span>${form.po_no||''}</span></div>
+      <div class="po-foot"><span>${company?.legal_name||'-'}</span><span>${form.po_no||''}</span></div>
     </div>`);
   }
 
