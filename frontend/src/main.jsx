@@ -1899,7 +1899,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <div class="payment-row">
         <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
         <div><b>จำนวนบิล:</b> ${voucherExpenses.length || 1} รายการ</div>
-        <div><b>เลขที่ใบวางบิล / Billing Note No.:</b> ${v.billing_note_no||'-'}</div>
+        <div></div>
       </div>
 
       <table class="items">
