@@ -1956,129 +1956,169 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
 
     const copy=(copyNo, copyText)=>`
     <section class="wht-standard">
-      <div class="wht-copy">ฉบับที่ ${copyNo} (${copyText})</div>
-      <div class="wht-title">
-        <h2>หนังสือรับรองการหักภาษี ณ ที่จ่าย</h2>
-        <h3>ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</h3>
+      <div class="wht-copy-lines">
+        <div><b>ฉบับที่ ${copyNo}</b> (${copyText})</div>
+        <div class="copy-note">${copyNo===1?'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี':'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย เก็บไว้เป็นหลักฐาน'}</div>
       </div>
 
-      <div class="wht-book">
-        <span>เล่มที่ <b>....................</b></span>
-        <span>เลขที่ <b>${v.wht_certificate_no||''}</b></span>
+      <div class="wht-head">
+        <div class="wht-head-center">
+          <div class="wht-main-title">หนังสือรับรองการหักภาษี ณ ที่จ่าย</div>
+          <div class="wht-sub-title">ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
+        </div>
+        <div class="wht-head-meta">
+          <div>เล่มที่ <span class="fill-line">....................</span></div>
+          <div>เลขที่ <span class="fill-line strong">${v.wht_certificate_no||''}</span></div>
+        </div>
       </div>
 
-      <div class="wht-box">
-        <div class="party-head">
+      <div class="party-box">
+        <div class="party-top">
           <b>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย :-</b>
-          <div class="tax-id-row"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><span class="tax-boxes">${taxBoxes(company?.tax_id)}</span></div>
+          <div class="tax-id-row"><b>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</b><span class="tax-boxes">${taxBoxes(company?.tax_id)}</span></div>
         </div>
-        <div class="wht-line"><span>ชื่อ</span><b>${company?.legal_name||'Sea Mountain'}</b></div>
-        <div class="wht-line"><span>ที่อยู่</span><b>${company?.address||'-'}</b></div>
+        <div class="party-field"><span>ชื่อ</span><b>${company?.legal_name||'Sea Mountain'}</b></div>
+        <div class="party-field"><span>ที่อยู่</span><b>${company?.address||'-'}</b></div>
       </div>
 
-      <div class="wht-box">
-        <div class="party-head">
+      <div class="party-box payee-box">
+        <div class="party-top">
           <b>ผู้ถูกหักภาษี ณ ที่จ่าย :-</b>
-          <div class="tax-id-row"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><span class="tax-boxes">${taxBoxes(vendor?.tax_id)}</span></div>
+          <div class="tax-id-row"><b>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</b><span class="tax-boxes">${taxBoxes(vendor?.tax_id)}</span></div>
         </div>
-        <div class="wht-line"><span>ชื่อ</span><b>${v.payee_name}</b></div>
-        <div class="wht-line"><span>ที่อยู่</span><b>${vendor?.address||'-'}</b></div>
+        <div class="party-field"><span>ชื่อ</span><b>${v.payee_name}</b></div>
+        <div class="party-field"><span>ที่อยู่</span><b>${vendor?.address||'-'}</b></div>
       </div>
 
       <div class="wht-ref">
         <span>ลำดับที่ ............ ในแบบ</span>
-        <span>☐ (1) ภ.ง.ด.1ก</span>
-        <span>☐ (2) ภ.ง.ด.1ก พิเศษ</span>
-        <span>☐ (3) ภ.ง.ด.2</span>
-        <span>${vendor?.entity_type==='INDIVIDUAL'?'☑':'☐'} (4) ภ.ง.ด.3</span>
-        <span>☐ (5) ภ.ง.ด.2ก</span>
-        <span>☐ (6) ภ.ง.ด.3ก</span>
-        <span>${vendor?.entity_type==='JURISTIC'?'☑':'☐'} (7) ภ.ง.ด.53</span>
+        <span>□ (1) ภ.ง.ด.1ก</span>
+        <span>□ (2) ภ.ง.ด.1ก พิเศษ</span>
+        <span>□ (3) ภ.ง.ด.2</span>
+        <span>${vendor?.entity_type==='INDIVIDUAL'?'☑':'□'} (4) ภ.ง.ด.3</span>
+        <span>□ (5) ภ.ง.ด.2ก</span>
+        <span>□ (6) ภ.ง.ด.3ก</span>
+        <span>${vendor?.entity_type==='JURISTIC'?'☑':'□'} (7) ภ.ง.ด.53</span>
       </div>
 
       <table class="wht-table">
         <thead>
           <tr>
             <th>ประเภทเงินได้พึงประเมินที่จ่าย</th>
-            <th>วัน เดือน หรือปีภาษี ที่จ่าย</th>
+            <th>วัน เดือน<br>หรือปีภาษี ที่จ่าย</th>
             <th>จำนวนเงินที่จ่าย</th>
-            <th>ภาษีที่หัก และนำส่งไว้</th>
+            <th>ภาษีที่หัก<br>และนำส่งไว้</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>1. เงินเดือน ค่าจ้าง เบี้ยเลี้ยง โบนัส ฯลฯ ตามมาตรา 40 (1)</td><td></td><td></td><td></td></tr>
-          <tr><td>2. ค่าธรรมเนียม ค่านายหน้า ฯลฯ ตามมาตรา 40 (2)</td><td></td><td></td><td></td></tr>
-          <tr><td>3. ค่าแห่งลิขสิทธิ์ ฯลฯ ตามมาตรา 40 (3)</td><td></td><td></td><td></td></tr>
-          <tr><td>4. (ก) ดอกเบี้ย ฯลฯ ตามมาตรา 40 (4) (ก)</td><td></td><td></td><td></td></tr>
-          <tr><td>4. (ข) เงินปันผล เงินส่วนแบ่งกำไร ฯลฯ ตามมาตรา 40 (4) (ข)</td><td></td><td></td><td></td></tr>
-          <tr class="${isService?'active-income':''}">
-            <td>5. การจ่ายเงินได้ที่ต้องหักภาษี ณ ที่จ่าย ตามคำสั่งกรมสรรพากรที่ออกตามมาตรา 3 เตรส เช่น ค่าจ้างทำของ ค่าโฆษณา ค่าเช่า ค่าเบี้ยประกันวินาศภัย ฯลฯ<br><b>รายละเอียด: ${incomeLabel}</b></td>
+          <tr class="r1"><td>1. เงินเดือน ค่าจ้าง เบี้ยเลี้ยง โบนัส ฯลฯ ตามมาตรา 40 (1)</td><td></td><td></td><td></td></tr>
+          <tr class="r1"><td>2. ค่าธรรมเนียม ค่านายหน้า ฯลฯ ตามมาตรา 40 (2)</td><td></td><td></td><td></td></tr>
+          <tr class="r1"><td>3. ค่าแห่งลิขสิทธิ์ ฯลฯ ตามมาตรา 40 (3)</td><td></td><td></td><td></td></tr>
+          <tr class="r1"><td>4. (ก) ดอกเบี้ย ฯลฯ ตามมาตรา 40 (4) (ก)</td><td></td><td></td><td></td></tr>
+          <tr class="r4b"><td>
+            <div>4. (ข) เงินปันผล เงินส่วนแบ่งกำไร ฯลฯ ตามมาตรา 40 (4) (ข)</div>
+            <div class="indent">(1) กรณีผู้จ่ายเงินได้เป็นบริษัทหรือห้างหุ้นส่วนนิติบุคคลที่ตั้งขึ้นตามกฎหมายไทย</div>
+            <div class="indent2">(1.1) อัตราร้อยละ 30 ของกำไรสุทธิ</div>
+            <div class="indent2">(1.2) อัตราร้อยละ 25 ของกำไรสุทธิ</div>
+            <div class="indent2">(1.3) อัตราร้อยละ 20 ของกำไรสุทธิ</div>
+            <div class="indent2">(1.4) อัตราอื่น ๆ (ระบุ) ............ ของกำไรสุทธิ</div>
+            <div class="indent">(2) กรณีผู้ได้รับเงินปันผลได้รับเครดิตภาษีเนื่องจากจ่ายจากกำไรสุทธิ</div>
+          </td><td></td><td></td><td></td></tr>
+          <tr class="${isService?'active-income':''} service-row">
+            <td>5. การจ่ายเงินได้ที่ต้องหักภาษี ณ ที่จ่าย ตามคำสั่งกรมสรรพากรที่ออกตามมาตรา 3 เตรส เช่น ค่าจ้างทำของ ค่าโฆษณา ค่าเช่า ค่าเบี้ยประกันวินาศภัย ฯลฯ
+              <div class="income-detail"><b>รายละเอียด:</b> ${incomeLabel}</div>
+            </td>
             <td>${rowDate(isService)}</td><td>${rowAmount(isService)}</td><td>${rowTax(isService)}</td>
           </tr>
-          <tr class="${!isService?'active-income':''}">
+          <tr class="${!isService?'active-income':''} other-row">
             <td>6. อื่น ๆ (ระบุ) <b>${!isService?incomeLabel:''}</b></td>
             <td>${rowDate(!isService)}</td><td>${rowAmount(!isService)}</td><td>${rowTax(!isService)}</td>
           </tr>
           <tr class="wht-total"><td colspan="2"><b>รวมเงินที่จ่ายและภาษีที่หักนำส่ง</b></td><td><b>${money(base)}</b></td><td><b>${money(v.withholding_tax)}</b></td></tr>
-          <tr><td><b>รวมเงินภาษีที่หักนำส่ง (ตัวอักษร)</b></td><td colspan="3"><b>${taxAmountText}</b></td></tr>
+          <tr class="wht-words"><td><b>รวมเงินภาษีที่หักนำส่ง (ตัวอักษร)</b></td><td colspan="3"><b>(${taxAmountText})</b></td></tr>
         </tbody>
       </table>
 
-      <div class="wht-funds">เงินที่จ่ายเข้า กบข./กสจ./กองทุนสงเคราะห์โรงเรียนเอกชน ............ บาท &nbsp;&nbsp; กองทุนประกันสังคม ............ บาท &nbsp;&nbsp; กองทุนสำรองเลี้ยงชีพ ............ บาท</div>
+      <div class="wht-funds">
+        เงินที่จ่ายเข้า กบข./กสจ./กองทุนสงเคราะห์โรงเรียนเอกชน ............ บาท
+        &nbsp;&nbsp; กองทุนประกันสังคม ............ บาท
+        &nbsp;&nbsp; กองทุนสำรองเลี้ยงชีพ ............ บาท
+      </div>
 
       <div class="wht-payer">
         <b>ผู้จ่ายเงิน</b>
         <span>☑ (1) หัก ณ ที่จ่าย</span>
-        <span>☐ (2) ออกให้ตลอดไป</span>
-        <span>☐ (3) ออกให้ครั้งเดียว</span>
-        <span>☐ (4) อื่น ๆ (ระบุ) ............................</span>
+        <span>□ (2) ออกให้ตลอดไป</span>
+        <span>□ (3) ออกให้ครั้งเดียว</span>
+        <span>□ (4) อื่น ๆ (ระบุ) ....................................</span>
       </div>
 
-      ${vendor?.entity_type==='UNKNOWN' ? '<div class="wht-warning"><b>ข้อมูลไม่ครบ:</b> กรุณาระบุประเภทผู้รับเงินว่าเป็นบุคคลธรรมดาหรือนิติบุคคล เพื่อเลือก ภ.ง.ด.3 / ภ.ง.ด.53 ให้ถูกต้อง</div>' : ''}
       <div class="wht-bottom">
-        <div class="wht-warning"><b>คำเตือน</b> ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ต้องปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
-        <div class="wht-certify">ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
+        <div class="warning-box">
+          <b>คำเตือน</b><br>
+          ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ต้องปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร
+        </div>
+        <div class="cert-box">
+          <div>ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
+          <div class="cert-sign">ลงชื่อ ............................................................ ผู้จ่ายเงิน</div>
+          <div class="cert-date">........../........../..........</div>
+          <div>(วัน เดือน ปี ที่ออกหนังสือรับรองฯ)</div>
+          <div class="stamp">ประทับตรา<br>นิติบุคคล<br>(ถ้ามี)</div>
+        </div>
       </div>
 
-      <div class="wht-sign">
-        <div>ลงชื่อ ............................................................ ผู้จ่ายเงิน</div>
-        <div>............................................................</div>
-        <div>(วัน เดือน ปี ที่ออกหนังสือรับรองฯ)</div>
-        <div class="stamp">ประทับตรา<br>นิติบุคคล<br>(ถ้ามี)</div>
+      <div class="wht-notes">
+        <b>หมายเหตุ</b> เลขประจำตัวผู้เสียภาษีอากร (13 หลัก) และช่องรายการต่าง ๆ ให้ใช้ตามข้อมูลจริงของผู้มีหน้าที่หักภาษีและผู้ถูกหักภาษี
       </div>
     </section>`;
 
     printDocument(v.wht_certificate_no||'50 ทวิ',
       `<style>
-        @page{size:A4 portrait;margin:8mm}
-        .wht-standard{box-sizing:border-box;width:194mm;height:281mm;margin:0 auto;padding:3mm;border:1px solid #000;break-inside:avoid;break-after:page;display:flex;flex-direction:column;color:#000;font:9px/1.25 Arial,"Noto Sans Thai",sans-serif}
+        @page{size:A4 portrait;margin:7mm}
+        .wht-standard{box-sizing:border-box;width:196mm;height:283mm;margin:0 auto;padding:2.2mm;border:1px solid #000;break-inside:avoid;break-after:page;color:#000;font-family:Arial,"Noto Sans Thai",sans-serif;font-size:8.2px;line-height:1.14;display:flex;flex-direction:column}
         .wht-standard *{box-sizing:border-box}
-        .wht-standard .wht-copy{font-size:8px;margin-bottom:1mm}
-        .wht-standard .wht-title{text-align:center;margin:0 0 1.5mm}
-        .wht-standard .wht-title h2{font-size:17px;line-height:1.1}.wht-standard .wht-title h3{font-size:10px;margin-top:1mm}
-        .wht-standard .wht-book{display:flex;justify-content:flex-end;gap:12mm;margin-bottom:1.5mm;font-size:9px}
-        .wht-standard .wht-box{border:1px solid #000;padding:1.5mm 2mm;margin-top:-1px}
-        .wht-standard .party-head{display:flex;justify-content:space-between;align-items:center;gap:2mm}
-        .wht-standard .tax-id-row{display:flex;align-items:center;gap:1mm;font-size:8px;white-space:nowrap}
-        .wht-standard .tax-boxes{display:inline-flex}
-        .wht-standard .tax-box{width:4.2mm;height:4.6mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:9px}
-        .wht-standard .tax-box:last-child{border-right:1px solid #000}
-        .wht-standard .wht-line{display:grid;grid-template-columns:11mm 1fr;gap:1mm;padding:1.5mm 0;border-bottom:1px dotted #777}
-        .wht-standard .wht-line:last-child{border-bottom:0}
-        .wht-standard .wht-ref{border:1px solid #000;border-top:0;padding:1.5mm 2mm;display:flex;flex-wrap:wrap;gap:1mm 4mm;font-size:8px}
-        .wht-standard .wht-table{width:100%;height:100mm;border-collapse:collapse;table-layout:fixed;font-size:8.2px;line-height:1.2}
-        .wht-standard .wht-table th,.wht-standard .wht-table td{border:1px solid #000;padding:1.5mm;vertical-align:top;overflow-wrap:anywhere}
-        .wht-standard .wht-table th:nth-child(1){width:54%}.wht-standard .wht-table th:nth-child(2){width:16%}.wht-standard .wht-table th:nth-child(3),.wht-standard .wht-table th:nth-child(4){width:15%}
-        .wht-standard .wht-table td:nth-child(n+2){text-align:right;white-space:nowrap}
-        .wht-standard .wht-table .active-income td{font-weight:700}
-        .wht-standard .wht-table .wht-total td{background:#f6f6f6}
-        .wht-standard .wht-funds{border:1px solid #000;border-top:0;padding:1.5mm 2mm;font-size:7.5px}
-        .wht-standard .wht-payer{border:1px solid #000;border-top:0;padding:1.5mm 2mm;display:flex;flex-wrap:wrap;gap:1mm 4mm;font-size:8px}
-        .wht-standard .wht-bottom{display:grid;grid-template-columns:1fr 1.25fr;border:1px solid #000;border-top:0;margin-top:auto;min-height:19mm}
-        .wht-standard .wht-bottom .wht-warning{font-size:8px;padding:2mm;border-right:1px solid #000}
-        .wht-standard .wht-bottom .wht-certify{text-align:center;padding:2mm;font-size:8px}
-        .wht-standard .wht-sign{position:relative;width:54%;margin:2mm 0 0 auto;text-align:center;line-height:1.55;font-size:8.5px;min-height:24mm}
-        .wht-standard .stamp{position:absolute;left:-24mm;top:0;border:1px solid #000;border-radius:50%;width:16mm;height:16mm;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7px}
+        .wht-copy-lines{font-size:7.7px;line-height:1.15;margin:0 0 1mm 1mm}
+        .copy-note{font-size:7.2px}
+        .wht-head{position:relative;min-height:13mm;border:1px solid #000;border-bottom:0}
+        .wht-head-center{text-align:center;padding-top:1.8mm}
+        .wht-main-title{font-size:16px;font-weight:800;line-height:1}
+        .wht-sub-title{font-size:9.5px;font-weight:700;margin-top:1mm}
+        .wht-head-meta{position:absolute;right:2.5mm;top:1.8mm;display:grid;gap:1.2mm;font-size:8px}
+        .fill-line{display:inline-block;min-width:24mm;border-bottom:1px dotted #555;text-align:center;padding:0 .5mm}
+        .fill-line.strong{font-weight:700}
+        .party-box{border:1px solid #000;border-bottom:0;padding:1.3mm 2mm}
+        .party-top{display:flex;justify-content:space-between;align-items:center;gap:2mm;min-height:6mm}
+        .tax-id-row{display:flex;align-items:center;gap:1.3mm;font-size:7.6px;white-space:nowrap}
+        .tax-boxes{display:inline-flex}
+        .tax-box{width:4.1mm;height:4.7mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:9px}
+        .tax-box:last-child{border-right:1px solid #000}
+        .party-field{display:grid;grid-template-columns:10mm 1fr;align-items:center;min-height:5.6mm;border-top:1px dotted #777}
+        .party-field span{font-weight:700}
+        .party-field b{font-size:8.4px}
+        .wht-ref{border:1px solid #000;padding:1.3mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:.7mm 3.5mm;font-size:7.4px;min-height:7mm}
+        .wht-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5px;line-height:1.14}
+        .wht-table th,.wht-table td{border:1px solid #000;padding:1.2mm 1.4mm;vertical-align:top}
+        .wht-table th{text-align:center;font-weight:700}
+        .wht-table th:nth-child(1){width:54%}.wht-table th:nth-child(2){width:16%}.wht-table th:nth-child(3),.wht-table th:nth-child(4){width:15%}
+        .wht-table td:nth-child(n+2){text-align:right;white-space:nowrap;vertical-align:bottom}
+        .wht-table .r1 td{height:8.2mm}
+        .wht-table .r4b td{height:46mm}
+        .wht-table .service-row td{height:24mm}
+        .wht-table .other-row td{height:8mm}
+        .indent{padding-left:4mm;margin-top:1mm}.indent2{padding-left:8mm;margin-top:.6mm}
+        .income-detail{margin-top:1.2mm}
+        .active-income td{font-weight:700}
+        .wht-total td{height:6.5mm;vertical-align:middle!important}
+        .wht-words td{height:6.5mm;vertical-align:middle!important}
+        .wht-funds{border:1px solid #000;border-top:0;padding:1.3mm 2mm;font-size:7.1px;min-height:6mm}
+        .wht-payer{border:1px solid #000;border-top:0;padding:1.3mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:1mm 4mm;font-size:7.4px;min-height:6mm}
+        .wht-bottom{margin-top:auto;display:grid;grid-template-columns:42% 58%;border:1px solid #000;min-height:31mm}
+        .warning-box{padding:2.2mm;border-right:1px solid #000;font-size:7.1px;line-height:1.3}
+        .cert-box{position:relative;padding:2.2mm;text-align:center;font-size:7.2px}
+        .cert-sign{margin-top:11mm}
+        .cert-date{margin-top:2mm}
+        .stamp{position:absolute;left:4mm;bottom:3mm;border:1px solid #000;border-radius:50%;width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6.8px}
+        .wht-notes{font-size:6.7px;line-height:1.2;padding:1mm 1mm 0}
         @media print{.wht-standard:last-child{break-after:auto}}
       </style>` +
       copy(1,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี') +
