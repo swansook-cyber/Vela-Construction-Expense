@@ -2254,10 +2254,10 @@ function PurchaseOrderPanel({ vendors }) {
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111}
       .po-page{box-sizing:border-box;width:196mm;height:283mm;border:1px solid #222;padding:5.5mm;display:flex;flex-direction:column;font-size:9.5px;line-height:1.28}
       .po-head{display:grid;grid-template-columns:72mm 54mm 52mm;gap:4mm;align-items:start;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
-      .po-brand{display:grid;grid-template-columns:27mm minmax(0,1fr);gap:3mm;align-items:start}
+      .po-brand{display:grid;grid-template-columns:30mm minmax(0,1fr);gap:3.5mm;align-items:start}
       .po-logo{width:27mm;height:22mm;display:block}.po-logo svg{width:100%;height:100%;display:block}
-      .po-company{font-size:8.2px;line-height:1.28;overflow-wrap:normal;word-break:normal}
-      .po-company b{font-size:10px}.po-company .brand-sub{font-size:7.7px;font-weight:700}
+      .po-company{font-size:9px;line-height:1.3;overflow-wrap:normal;word-break:normal}
+      .po-company b{font-size:11px}.po-company .brand-sub{font-size:8.2px;font-weight:700}
       .po-title{text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
       .po-meta{justify-self:end;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2.2mm 3mm;align-items:center;padding-top:2mm}
       .po-meta span{font-weight:700}.po-meta b{border-bottom:1px solid #111;padding:0 1mm 1mm;text-align:right;font-size:10px}
@@ -2274,9 +2274,9 @@ function PurchaseOrderPanel({ vendors }) {
       .po-summary{width:48%;margin:4mm 0 0 auto;border-collapse:collapse}
       .po-summary td{border:1px solid #111;padding:2.5mm 3mm;font-size:9.5px}.po-summary td:last-child{text-align:right;font-weight:700}
       .po-summary tr:last-child td{font-weight:800;font-size:10px}
-      .po-words{display:grid;grid-template-columns:42mm 1fr;margin-top:4mm;border:1px solid #111;min-height:11mm;align-items:center}
-      .po-words .label{background:#f0f0f0;height:100%;display:flex;align-items:center;padding:2mm 3mm;font-weight:700;line-height:1.2}
-      .po-words .value{padding:2mm 4mm;font-weight:800;font-size:11px}
+      .po-words{display:grid;grid-template-columns:42mm 1fr;margin-top:4mm;border:1px solid #111;min-height:12mm;align-items:stretch;overflow:hidden}
+      .po-words .label{background:#f0f0f0;display:flex;align-items:center;padding:2mm 3mm;font-weight:700;line-height:1.2;border-right:1px solid #111}
+      .po-words .value{display:flex;align-items:center;padding:2mm 4mm;font-weight:800;font-size:11px}
       .po-remark{margin-top:auto;border:1px solid #111;min-height:28mm}
       .po-remark .head{background:#f0f0f0;padding:2mm 3mm;font-weight:800;font-size:10px}
       .po-remark .body{padding:3mm;white-space:pre-wrap}
