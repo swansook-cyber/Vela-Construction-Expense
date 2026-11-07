@@ -1857,9 +1857,9 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       html,body{margin:0;padding:0}
       body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000;font-size:10.5px}
       .pv-page{box-sizing:border-box;width:190mm;height:277mm;border:1.2px solid #000;padding:8mm;display:flex;flex-direction:column;overflow:hidden}
-      .pv-head{display:grid;grid-template-columns:1.45fr .9fr .9fr;align-items:start;gap:10px;border-bottom:1px solid #000;padding-bottom:7px}
+      .pv-head{position:relative;display:grid;grid-template-columns:1.45fr .9fr .9fr;align-items:start;gap:10px;border-bottom:1px solid #000;padding-bottom:7px}
       .company{font-size:10.5px;line-height:1.45}.company b{font-size:12px}
-      .title{text-align:center}.title h1{font-size:22px;margin:0;line-height:1.1}.title b{font-size:10px}
+      .title{position:absolute;left:50%;top:0;transform:translateX(-50%);text-align:center;white-space:nowrap}.title h1{font-size:22px;margin:0;line-height:1.1}.title b{font-size:10px}
       .meta{display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center}.meta span{font-weight:700}.meta b{border-bottom:1px solid #000;padding:1px 4px;text-align:right}
       .party{display:grid;grid-template-columns:135px 1fr;border-bottom:1px solid #000}.party div{padding:6px 7px}.party .label{font-weight:700;border-right:1px solid #000}
       .payment-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid #000}
@@ -1872,6 +1872,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       .explain{border:1px solid #000;padding:8px;margin-top:8px;min-height:24mm}
       .sign{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #000;border-right:0;margin-top:8px}
       .sign .cell{border-right:1px solid #000;text-align:center;min-height:38mm;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+      .pv-page .sign .cell>div{border-top:0!important;padding-top:0!important}
       .sign .role{font-weight:700}.sign .date{font-size:9px}
       .warning{margin-top:7px;border:1px solid #a33;color:#a33;padding:6px;font-weight:700}
       .foot{font-size:8.5px;color:#333;margin-top:5px;padding-bottom:2mm}
@@ -1952,6 +1953,8 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     const rowAmount=(active)=>active ? money(base) : '';
     const rowTax=(active)=>active ? money(v.withholding_tax) : '';
     const rowDate=(active)=>active ? thaiDate(v.voucher_date) : '';
+    const taxBoxes=(value)=>String(value||'').replace(/\D/g,'').padEnd(13,' ').slice(0,13).split('').map((d)=>`<span class="tax-box">${d===' '?'':d}</span>`).join('');
+    const taxAmountText=thaiBahtText(v.withholding_tax);
 
     const copy=(copyNo, copyText)=>`
     <section class="wht-standard">
@@ -1967,15 +1970,19 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       </div>
 
       <div class="wht-box">
-        <b>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย :-</b>
-        <div class="wht-line"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><b>${company?.tax_id||'-'}</b></div>
+        <div class="party-head">
+          <b>ผู้มีหน้าที่หักภาษี ณ ที่จ่าย :-</b>
+          <div class="tax-id-row"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><span class="tax-boxes">${taxBoxes(company?.tax_id)}</span></div>
+        </div>
         <div class="wht-line"><span>ชื่อ</span><b>${company?.legal_name||'Sea Mountain'}</b></div>
         <div class="wht-line"><span>ที่อยู่</span><b>${company?.address||'-'}</b></div>
       </div>
 
       <div class="wht-box">
-        <b>ผู้ถูกหักภาษี ณ ที่จ่าย :-</b>
-        <div class="wht-line"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><b>${vendor?.tax_id||'-'}</b></div>
+        <div class="party-head">
+          <b>ผู้ถูกหักภาษี ณ ที่จ่าย :-</b>
+          <div class="tax-id-row"><span>เลขประจำตัวผู้เสียภาษีอากร (13 หลัก)</span><span class="tax-boxes">${taxBoxes(vendor?.tax_id)}</span></div>
+        </div>
         <div class="wht-line"><span>ชื่อ</span><b>${v.payee_name}</b></div>
         <div class="wht-line"><span>ที่อยู่</span><b>${vendor?.address||'-'}</b></div>
       </div>
@@ -2015,7 +2022,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
             <td>${rowDate(!isService)}</td><td>${rowAmount(!isService)}</td><td>${rowTax(!isService)}</td>
           </tr>
           <tr class="wht-total"><td colspan="2"><b>รวมเงินที่จ่ายและภาษีที่หักนำส่ง</b></td><td><b>${money(base)}</b></td><td><b>${money(v.withholding_tax)}</b></td></tr>
-          <tr><td><b>รวมเงินภาษีที่หักนำส่ง (ตัวอักษร)</b></td><td colspan="3">................................................................................................................</td></tr>
+          <tr><td><b>รวมเงินภาษีที่หักนำส่ง (ตัวอักษร)</b></td><td colspan="3"><b>${taxAmountText}</b></td></tr>
         </tbody>
       </table>
 
@@ -2030,8 +2037,10 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       </div>
 
       ${vendor?.entity_type==='UNKNOWN' ? '<div class="wht-warning"><b>ข้อมูลไม่ครบ:</b> กรุณาระบุประเภทผู้รับเงินว่าเป็นบุคคลธรรมดาหรือนิติบุคคล เพื่อเลือก ภ.ง.ด.3 / ภ.ง.ด.53 ให้ถูกต้อง</div>' : ''}
-      <div class="wht-warning"><b>คำเตือน</b> ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ต้องปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
-      <div class="wht-certify">ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
+      <div class="wht-bottom">
+        <div class="wht-warning"><b>คำเตือน</b> ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ต้องปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
+        <div class="wht-certify">ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
+      </div>
 
       <div class="wht-sign">
         <div>ลงชื่อ ............................................................ ผู้จ่ายเงิน</div>
@@ -2045,26 +2054,33 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       `<style>
         @page{size:A4 portrait;margin:8mm}
         body{font-family:Arial,"Noto Sans Thai",sans-serif;font-size:10px}
-        .wht-standard{min-height:277mm;page-break-after:always;color:#000}
-        .wht-copy{font-size:10px;margin-bottom:2px}
-        .wht-title{text-align:center;margin:2px 0 6px}
-        .wht-title h2{font-size:18px;margin:0}.wht-title h3{font-size:12px;margin:2px 0}
-        .wht-book{display:flex;justify-content:flex-end;gap:26px;margin-bottom:4px}
-        .wht-box{border:1px solid #000;padding:5px 7px;margin-top:-1px}
-        .wht-line{display:grid;grid-template-columns:210px 1fr;gap:8px;padding:2px 0}
-        .wht-ref{border:1px solid #000;border-top:0;padding:5px 7px;display:flex;flex-wrap:wrap;gap:4px 12px}
-        .wht-table{width:100%;border-collapse:collapse;font-size:9px}
-        .wht-table th,.wht-table td{border:1px solid #000;padding:4px;vertical-align:top}
-        .wht-table th:nth-child(1){width:55%}.wht-table th:nth-child(2){width:15%}.wht-table th:nth-child(3),.wht-table th:nth-child(4){width:15%}
+        .wht-standard{box-sizing:border-box;min-height:277mm;page-break-after:always;color:#000;padding:0 1mm}
+        .wht-copy{font-size:9px;margin:0 0 2px 2px;line-height:1.25}
+        .wht-title{text-align:center;margin:1px 0 3px}
+        .wht-title h2{font-size:17px;margin:0;line-height:1.05}.wht-title h3{font-size:10.5px;margin:1px 0}
+        .wht-book{display:flex;justify-content:flex-end;gap:22px;margin:-2px 4px 2px 0;font-size:9px}
+        .wht-box{border:1px solid #000;padding:4px 6px;margin-top:-1px}
+        .party-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+        .tax-id-row{display:flex;align-items:center;gap:5px;font-size:8.5px;white-space:nowrap}
+        .tax-boxes{display:inline-flex}
+        .tax-box{width:4.7mm;height:4.7mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:9px;box-sizing:border-box}
+        .tax-box:last-child{border-right:1px solid #000}
+        .wht-line{display:grid;grid-template-columns:36px 1fr;gap:6px;padding:2px 0;border-bottom:1px dotted #777}
+        .wht-line:last-child{border-bottom:0}
+        .wht-ref{border:1px solid #000;border-top:0;padding:4px 6px;display:flex;flex-wrap:wrap;gap:3px 10px;font-size:8.5px}
+        .wht-table{width:100%;border-collapse:collapse;font-size:8.2px;line-height:1.18}
+        .wht-table th,.wht-table td{border:1px solid #000;padding:3px 4px;vertical-align:top}
+        .wht-table th:nth-child(1){width:56%}.wht-table th:nth-child(2){width:14%}.wht-table th:nth-child(3),.wht-table th:nth-child(4){width:15%}
         .wht-table td:nth-child(n+2){text-align:right;white-space:nowrap}
-        .wht-table .active-income td{font-weight:600}
+        .wht-table .active-income td{font-weight:700}
         .wht-total td{background:#f6f6f6}
-        .wht-funds{border:1px solid #000;border-top:0;padding:5px}
-        .wht-payer{border:1px solid #000;border-top:0;padding:5px;display:flex;flex-wrap:wrap;gap:6px 16px}
-        .wht-warning{font-size:8px;margin-top:5px}
-        .wht-certify{text-align:center;margin-top:9px}
-        .wht-sign{position:relative;width:52%;margin-left:auto;text-align:center;margin-top:8px;line-height:1.8}
-        .stamp{position:absolute;left:-100px;top:0;border:1px solid #000;border-radius:50%;width:68px;height:68px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:8px}
+        .wht-funds{border:1px solid #000;border-top:0;padding:4px;font-size:8px}
+        .wht-payer{border:1px solid #000;border-top:0;padding:4px;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:8.5px}
+        .wht-bottom{display:grid;grid-template-columns:1fr 1.25fr;border:1px solid #000;border-top:0}
+        .wht-bottom .wht-warning{font-size:7.8px;padding:5px;margin:0;border-right:1px solid #000}
+        .wht-bottom .wht-certify{text-align:center;padding:5px;margin:0;font-size:8px}
+        .wht-sign{position:relative;width:54%;margin-left:auto;text-align:center;margin-top:6px;line-height:1.65;font-size:8.5px}
+        .stamp{position:absolute;left:-92px;top:1px;border:1px solid #000;border-radius:50%;width:58px;height:58px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7.5px}
         @media print{.wht-standard:last-child{page-break-after:auto}}
       </style>` +
       copy(1,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี') +
