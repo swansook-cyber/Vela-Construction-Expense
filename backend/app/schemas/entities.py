@@ -159,6 +159,7 @@ class PaymentVoucherCreate(BaseModel):
     cheque_no: str | None = None
     cheque_date: date | None = None
     bank_name: str | None = None
+    billing_note_no: str | None = Field(default=None, max_length=120)
     notes: str | None = None
 
 
@@ -178,4 +179,5 @@ class PaymentVoucherPaymentUpdate(BaseModel):
     cheque_no: str | None = None
     cheque_date: date | None = None
     bank_name: str | None = None
+    billing_note_no: str | None = Field(default=None, max_length=120)
     notes: str | None = None
