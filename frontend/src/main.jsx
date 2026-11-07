@@ -1894,7 +1894,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <div class="payment-row">
         <div><b>วิธีจ่าย:</b> ${method}</div>
         <div><b>ธนาคาร:</b> ${v.bank_name||'-'}</div>
-        <div><b>เลขที่เช็ค / อ้างอิง:</b> ${v.cheque_no||'-'}</div>
+        <div><b>เลขที่เช็ค:</b> ${v.cheque_no||'-'}</div>
       </div>
       <div class="payment-row">
         <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
