@@ -1947,7 +1947,8 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       : Number(v.gross_amount||0);
     const rate=v.wht_rate!=null ? Number(v.wht_rate) : (base ? Number(v.withholding_tax||0)/base*100 : 0);
     const incomeLabel=v.income_type||voucherExpenses.map((item)=>item.description).join(' / ')||e?.description||'อื่น ๆ';
-    const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง|ก่อสร้าง|ซ่อม|ทาสี|มุงหลังคา|ติดตั้ง|ปรับปรุง/i.test(incomeLabel);
+    const serviceContext=[incomeLabel,...voucherExpenses.map((item)=>item.description||''),...voucherExpenses.map((item)=>item.cost_code_name||item.cost_code||'')].join(' ');
+    const isService=/บริการ|จ้าง|ทำของ|โฆษณา|เช่า|ขนส่ง|ก่อสร้าง|ซ่อม|ทาสี|มุงหลังคา|ติดตั้ง|ปรับปรุง|ประปา|ไฟฟ้า|โครงสร้าง|งาน/i.test(serviceContext);
     const rowAmount=(active)=>active ? money(base) : '';
     const rowTax=(active)=>active ? money(v.withholding_tax) : '';
     const rowDate=(active)=>active ? thaiDate(v.voucher_date) : '';
@@ -1958,7 +1959,6 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     <section class="wht-standard">
       <div class="wht-copy-lines">
         <div><b>ฉบับที่ ${copyNo}</b> (${copyText})</div>
-        <div class="copy-note">${copyNo===1?'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี':'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย เก็บไว้เป็นหลักฐาน'}</div>
       </div>
 
       <div class="wht-head">
@@ -2077,8 +2077,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         @page{size:A4 portrait;margin:7mm}
         .wht-standard{box-sizing:border-box;width:196mm;height:283mm;margin:0 auto;padding:2.2mm;border:1px solid #000;break-inside:avoid;break-after:page;color:#000;font-family:Arial,"Noto Sans Thai",sans-serif;font-size:8.2px;line-height:1.14;display:flex;flex-direction:column}
         .wht-standard *{box-sizing:border-box}
-        .wht-copy-lines{font-size:7.7px;line-height:1.15;margin:0 0 1mm 1mm}
-        .copy-note{font-size:7.2px}
+        .wht-copy-lines{font-size:7.7px;line-height:1.15;margin:0 0 .6mm 1mm}
         .wht-head{position:relative;min-height:13mm;border:1px solid #000;border-bottom:0}
         .wht-head-center{text-align:center;padding-top:1.8mm}
         .wht-main-title{font-size:16px;font-weight:800;line-height:1}
@@ -2112,7 +2111,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         .wht-words td{height:6.5mm;vertical-align:middle!important}
         .wht-funds{border:1px solid #000;border-top:0;padding:1.3mm 2mm;font-size:7.1px;min-height:6mm}
         .wht-payer{border:1px solid #000;border-top:0;padding:1.3mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:1mm 4mm;font-size:7.4px;min-height:6mm}
-        .wht-bottom{margin-top:auto;display:grid;grid-template-columns:42% 58%;border:1px solid #000;min-height:31mm}
+        .wht-bottom{margin-top:8mm;display:grid;grid-template-columns:42% 58%;border:1px solid #000;min-height:31mm}
         .warning-box{padding:2.2mm;border-right:1px solid #000;font-size:7.1px;line-height:1.3}
         .cert-box{position:relative;padding:2.2mm;text-align:center;font-size:7.2px}
         .cert-sign{margin-top:11mm}
