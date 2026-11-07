@@ -2238,7 +2238,16 @@ function PurchaseOrderPanel({ vendors }) {
 
   function printPo(){
     const validItems=items.filter((row)=>row.description.trim() || Number(row.qty||0) || Number(row.unit_price||0));
-    const logoUrl=`${window.location.origin}/sea-mountain-logo.svg`;
+    const logoSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 420" aria-label="Sea Mountain">
+      <defs><linearGradient id="pm" x1="0" x2="1"><stop offset="0" stop-color="#1f6f2a"/><stop offset="1" stop-color="#3f8f2d"/></linearGradient><linearGradient id="pw" x1="0" x2="1"><stop offset="0" stop-color="#0e8aa0"/><stop offset="1" stop-color="#005f8f"/></linearGradient></defs>
+      <g fill="none" stroke="#07345f" stroke-width="10" stroke-linecap="round"><path d="M85 190 A220 220 0 0 1 510 150"/><path d="M215 60 C330 70 405 105 505 145" stroke-width="4"/></g>
+      <path d="M105 245 L245 85 L300 145 L345 118 L475 250 Z" fill="url(#pm)"/><path d="M154 190 L245 100 L277 148 L300 130 L338 170 L312 156 L298 178 L276 152 L246 126 L216 165 Z" fill="#fff"/>
+      <path d="M70 275 C145 200 215 210 258 256 C225 233 197 240 181 260 C228 242 265 255 300 285 C230 272 170 290 90 305 Z" fill="url(#pw)"/><path d="M76 286 C150 225 216 238 246 270 C196 251 156 274 128 296" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
+      <path d="M265 295 C330 278 390 270 500 290" fill="none" stroke="#c58f32" stroke-width="12" stroke-linecap="round"/>
+      <g fill="#07345f"><circle cx="435" cy="244" r="18"/><circle cx="495" cy="244" r="18"/><rect x="432" y="215" width="62" height="20" rx="8"/><circle cx="461" cy="197" r="11"/><path d="M455 205 L443 218 L470 224 L484 210 L475 205 Z"/><circle cx="430" cy="118" r="10"/><path d="M424 127 L416 151 L436 166 L452 160 L438 143 L439 129 Z"/><path d="M438 145 L463 153 L474 169 L462 176 L448 158 Z"/><path d="M422 132 L445 116" stroke="#07345f" stroke-width="8" fill="none" stroke-linecap="round"/></g>
+      <text x="300" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="62" font-weight="900" font-style="italic"><tspan fill="#07345f">SEA </tspan><tspan fill="#167327">MOUNTAIN</tspan></text>
+      <text x="300" y="392" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="3" fill="#07345f">ZIPLINE &amp; ATV ADVENTURE</text>
+    </svg>`;
     printDocument(form.po_no||'Purchase Order',`<style>
       @page{size:A4 portrait;margin:7mm}
       html,body{margin:0;padding:0}
@@ -2246,7 +2255,7 @@ function PurchaseOrderPanel({ vendors }) {
       .po-page{box-sizing:border-box;width:196mm;height:283mm;border:1px solid #222;padding:5.5mm;display:flex;flex-direction:column;font-size:9.5px;line-height:1.28}
       .po-head{display:grid;grid-template-columns:72mm 54mm 52mm;gap:4mm;align-items:start;border-bottom:1.3px solid #111;padding-bottom:3.5mm}
       .po-brand{display:grid;grid-template-columns:27mm minmax(0,1fr);gap:3mm;align-items:start}
-      .po-logo{width:27mm;height:22mm;object-fit:contain;display:block}
+      .po-logo{width:27mm;height:22mm;display:block}.po-logo svg{width:100%;height:100%;display:block}
       .po-company{font-size:8.2px;line-height:1.28;overflow-wrap:normal;word-break:normal}
       .po-company b{font-size:10px}.po-company .brand-sub{font-size:7.7px;font-weight:700}
       .po-title{text-align:center;padding-top:3mm}.po-title h1{font-size:23px;line-height:1;margin:0 0 1mm}.po-title b{font-size:10.5px;letter-spacing:.03em}
@@ -2279,7 +2288,7 @@ function PurchaseOrderPanel({ vendors }) {
     <div class="po-page">
       <div class="po-head">
         <div class="po-brand">
-          <img class="po-logo" src="${logoUrl}" alt="Sea Mountain logo">
+          <div class="po-logo">${logoSvg}</div>
           <div class="po-company">
             <b>${company?.legal_name||'Sea Mountain'}</b><br>
             <span class="brand-sub">Sea Mountain Zipline & ATV Adventure</span><br>
