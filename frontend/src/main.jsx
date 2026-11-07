@@ -2161,6 +2161,201 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
 
 
 
+
+function PurchaseOrderPanel({ vendors }) {
+  const [company,setCompany]=useState(null);
+  const [form,setForm]=useState({
+    po_no:'',
+    po_date:today(),
+    vendor_id:'',
+    supplier_name:'',
+    supplier_address:'',
+    supplier_tax_id:'',
+    supplier_phone:'',
+    delivery_date:'',
+    payment_term:'',
+    remark:'',
+    vat_rate:'0',
+  });
+  const [items,setItems]=useState([{description:'',unit:'',qty:'1',unit_price:''}]);
+
+  useEffect(()=>{ api('/company-profile').then(setCompany).catch(()=>setCompany(null)); },[]);
+
+  function nextPoNo() {
+    const d=new Date();
+    const yy=String(d.getFullYear()).slice(-2);
+    const mm=String(d.getMonth()+1).padStart(2,'0');
+    const key=`sea-mountain-po-seq-${yy}${mm}`;
+    const next=Number(localStorage.getItem(key)||'0')+1;
+    localStorage.setItem(key,String(next));
+    return `PO-${yy}${mm}-${String(next).padStart(4,'0')}`;
+  }
+
+  function newPo() {
+    setForm({
+      po_no:nextPoNo(),
+      po_date:today(),
+      vendor_id:'',
+      supplier_name:'',
+      supplier_address:'',
+      supplier_tax_id:'',
+      supplier_phone:'',
+      delivery_date:'',
+      payment_term:'',
+      remark:'',
+      vat_rate:'0',
+    });
+    setItems([{description:'',unit:'',qty:'1',unit_price:''}]);
+  }
+
+  useEffect(()=>{ if(!form.po_no) newPo(); },[]);
+
+  function set(k,v){ setForm((x)=>({...x,[k]:v})); }
+
+  function chooseVendor(id){
+    const vendor=vendors.find((v)=>String(v.id)===String(id));
+    setForm((x)=>({
+      ...x,
+      vendor_id:id,
+      supplier_name:vendor?.name||'',
+      supplier_address:vendor?.address||'',
+      supplier_tax_id:vendor?.tax_id||'',
+      supplier_phone:vendor?.phone||'',
+    }));
+  }
+
+  function setItem(index,key,value){
+    setItems((rows)=>rows.map((row,i)=>i===index?{...row,[key]:value}:row));
+  }
+  function addItem(){ setItems((rows)=>[...rows,{description:'',unit:'',qty:'1',unit_price:''}]); }
+  function removeItem(index){
+    setItems((rows)=>rows.length===1?rows:rows.filter((_,i)=>i!==index));
+  }
+
+  const subtotal=items.reduce((sum,row)=>sum + Number(row.qty||0)*Number(row.unit_price||0),0);
+  const vat=subtotal*Number(form.vat_rate||0)/100;
+  const grandTotal=subtotal+vat;
+
+  function printPo(){
+    const validItems=items.filter((row)=>row.description.trim() || Number(row.qty||0) || Number(row.unit_price||0));
+    printDocument(form.po_no||'Purchase Order',`<style>
+      @page{size:A4 portrait;margin:10mm}
+      html,body{margin:0;padding:0}
+      body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#000}
+      .po-page{box-sizing:border-box;width:190mm;min-height:277mm;border:1px solid #000;padding:8mm;display:flex;flex-direction:column;font-size:10px;line-height:1.3}
+      .po-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;border-bottom:1.5px solid #000;padding-bottom:4mm}
+      .po-company{font-size:9px;line-height:1.35}.po-company b{font-size:12px}
+      .po-title{text-align:center;min-width:60mm}.po-title h1{font-size:22px;line-height:1;margin:0}.po-title b{font-size:11px}
+      .po-meta{justify-self:end;display:grid;grid-template-columns:auto 1fr;gap:4px 6px;min-width:48mm}.po-meta span{font-weight:700}.po-meta b{border-bottom:1px solid #000;padding:1px 3px;text-align:right}
+      .po-info{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #000}
+      .po-info>div{padding:4px 6px}.po-info>div:nth-child(odd){border-right:1px solid #000}
+      .po-info .wide{grid-column:1/-1;border-right:0}
+      .po-items{width:100%;border-collapse:collapse;margin-top:4mm;table-layout:fixed}
+      .po-items th,.po-items td{border:1px solid #000;padding:5px;vertical-align:top}
+      .po-items th{text-align:center;background:#f4f4f4}
+      .po-items .num{text-align:right;white-space:nowrap}
+      .po-summary{width:46%;margin:4mm 0 0 auto;border-collapse:collapse}
+      .po-summary td{border:1px solid #000;padding:5px}.po-summary td:last-child{text-align:right;font-weight:700}
+      .po-words{margin-top:3mm;border:1px solid #000;padding:5px;font-weight:700}
+      .po-remark{margin-top:auto;border:1px solid #000;min-height:24mm;padding:6px}
+      .po-sign{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #000;border-right:0;margin-top:4mm}
+      .po-sign>div{border-right:1px solid #000;text-align:center;min-height:28mm;padding:5px;display:flex;flex-direction:column;justify-content:flex-end}
+      .po-foot{font-size:8px;margin-top:2mm;color:#444}
+    </style>
+    <div class="po-page">
+      <div class="po-head">
+        <div class="po-company"><b>${company?.legal_name||'Sea Mountain'}</b><br>${company?.address||''}<br>เลขประจำตัวผู้เสียภาษี ${company?.tax_id||'-'}${company?.phone?`<br>โทร. ${company.phone}`:''}</div>
+        <div class="po-title"><h1>ใบสั่งซื้อ</h1><b>PURCHASE ORDER</b></div>
+        <div class="po-meta"><span>เลขที่</span><b>${form.po_no||'-'}</b><span>วันที่</span><b>${thaiDate(form.po_date)}</b></div>
+      </div>
+
+      <div class="po-info">
+        <div><b>ผู้ขาย / Supplier:</b> ${form.supplier_name||'-'}</div>
+        <div><b>Tax ID:</b> ${form.supplier_tax_id||'-'}</div>
+        <div class="wide"><b>ที่อยู่:</b> ${form.supplier_address||'-'}</div>
+        <div><b>โทร:</b> ${form.supplier_phone||'-'}</div>
+        <div><b>กำหนดส่ง:</b> ${form.delivery_date?thaiDate(form.delivery_date):'-'}</div>
+        <div><b>เงื่อนไขการชำระ:</b> ${form.payment_term||'-'}</div>
+        <div><b>VAT:</b> ${Number(form.vat_rate||0)}%</div>
+      </div>
+
+      <table class="po-items">
+        <thead><tr><th style="width:8%">ลำดับ</th><th>รายละเอียด</th><th style="width:12%">หน่วย</th><th style="width:12%">จำนวน</th><th style="width:16%">ราคาต่อหน่วย</th><th style="width:18%">จำนวนเงิน</th></tr></thead>
+        <tbody>${validItems.map((row,index)=>`<tr><td style="text-align:center">${index+1}</td><td>${row.description||'-'}</td><td style="text-align:center">${row.unit||'-'}</td><td class="num">${Number(row.qty||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td class="num">${money(row.unit_price)}</td><td class="num"><b>${money(Number(row.qty||0)*Number(row.unit_price||0))}</b></td></tr>`).join('')}</tbody>
+      </table>
+
+      <table class="po-summary">
+        <tr><td>ยอดรวม</td><td>${money(subtotal)}</td></tr>
+        <tr><td>VAT ${Number(form.vat_rate||0)}%</td><td>${money(vat)}</td></tr>
+        <tr><td><b>ยอดสุทธิ</b></td><td><b>${money(grandTotal)}</b></td></tr>
+      </table>
+      <div class="po-words">(${thaiBahtText(grandTotal)})</div>
+
+      <div class="po-remark"><b>หมายเหตุ / Remark</b><br>${form.remark||'-'}</div>
+
+      <div class="po-sign">
+        <div><b>ผู้จัดทำ / Prepared By</b><br><br>........................................</div>
+        <div><b>ผู้ตรวจสอบ / Checked By</b><br><br>........................................</div>
+        <div><b>ผู้อนุมัติ / Approved By</b><br><br>........................................</div>
+      </div>
+      <div class="po-foot">${company?.legal_name||'Sea Mountain'} — ${form.po_no||''}</div>
+    </div>`);
+  }
+
+  return <section className="panel">
+    <div className="section-head">
+      <div><p className="section-kicker">Purchase Order</p><h2>ใบสั่งซื้อ</h2><p>สร้าง พิมพ์ และส่งร้านค้า — ไม่เก็บประวัติ PO</p></div>
+      <button className="section-add" onClick={newPo}>+ New</button>
+    </div>
+
+    <div className="form-grid">
+      <label>เลขที่ PO<input value={form.po_no} readOnly /></label>
+      <label>วันที่ PO<input type="date" value={form.po_date} onChange={(e)=>set('po_date',e.target.value)} /></label>
+      <label>เลือกผู้ขาย
+        <select value={form.vendor_id} onChange={(e)=>chooseVendor(e.target.value)}>
+          <option value="">กรอกเอง</option>
+          {vendors.map((v)=><option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+      </label>
+      <label>ชื่อผู้ขาย<input value={form.supplier_name} onChange={(e)=>set('supplier_name',e.target.value)} /></label>
+      <label className="wide">ที่อยู่ผู้ขาย<textarea rows="2" value={form.supplier_address} onChange={(e)=>set('supplier_address',e.target.value)} /></label>
+      <label>เลขประจำตัวผู้เสียภาษี<input value={form.supplier_tax_id} onChange={(e)=>set('supplier_tax_id',e.target.value)} /></label>
+      <label>โทรศัพท์<input value={form.supplier_phone} onChange={(e)=>set('supplier_phone',e.target.value)} /></label>
+      <label>กำหนดส่ง<input type="date" value={form.delivery_date} onChange={(e)=>set('delivery_date',e.target.value)} /></label>
+      <label>เงื่อนไขการชำระ<input value={form.payment_term} onChange={(e)=>set('payment_term',e.target.value)} placeholder="เช่น 30 วัน / เงินสด" /></label>
+      <label>VAT<select value={form.vat_rate} onChange={(e)=>set('vat_rate',e.target.value)}><option value="0">ไม่มี VAT</option><option value="7">VAT 7%</option></select></label>
+    </div>
+
+    <div className="table-wrap" style={{marginTop:'16px'}}>
+      <table>
+        <thead><tr><th>#</th><th>รายละเอียด</th><th>หน่วย</th><th>จำนวน</th><th>ราคาต่อหน่วย</th><th>จำนวนเงิน</th><th></th></tr></thead>
+        <tbody>{items.map((row,index)=><tr key={index}>
+          <td>{index+1}</td>
+          <td><input value={row.description} onChange={(e)=>setItem(index,'description',e.target.value)} placeholder="รายการสินค้า / วัสดุ" /></td>
+          <td><input value={row.unit} onChange={(e)=>setItem(index,'unit',e.target.value)} placeholder="ชิ้น / อัน / ม." /></td>
+          <td><input type="number" min="0" step="0.01" value={row.qty} onChange={(e)=>setItem(index,'qty',e.target.value)} /></td>
+          <td><input type="number" min="0" step="0.01" value={row.unit_price} onChange={(e)=>setItem(index,'unit_price',e.target.value)} /></td>
+          <td className="amount">{money(Number(row.qty||0)*Number(row.unit_price||0))}</td>
+          <td><button className="mini danger" onClick={()=>removeItem(index)} disabled={items.length===1}>×</button></td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+
+    <div className="actions" style={{marginTop:'12px',justifyContent:'space-between'}}>
+      <button className="ghost" onClick={addItem}>+ เพิ่มรายการ</button>
+      <div className="calc" style={{minWidth:'320px'}}>
+        <span>ยอดรวม <b>{money(subtotal)}</b></span>
+        <span>VAT <b>{money(vat)}</b></span>
+        <span className="total-line">ยอดสุทธิ <b>{money(grandTotal)}</b></span>
+      </div>
+    </div>
+
+    <label style={{display:'block',marginTop:'12px'}}>หมายเหตุ<textarea rows="3" value={form.remark} onChange={(e)=>set('remark',e.target.value)} /></label>
+    <div className="actions" style={{marginTop:'14px'}}><button onClick={printPo}>พิมพ์ / Print PO</button></div>
+  </section>;
+}
+
+
 function CompanySettingsPanel() {
   const [form,setForm]=useState({legal_name:'Sea Mountain',tax_id:'',address:'',branch:'',phone:''});
   const [saved,setSaved]=useState('');
@@ -2342,6 +2537,7 @@ function App() {
         <button className={active === 'wht' ? 'active' : ''} onClick={() => setActive('wht')}>หัก ณ ที่จ่าย</button>
         <button className={active === 'voucher' ? 'active' : ''} onClick={() => setActive('voucher')}>ใบสำคัญจ่าย</button>
         <button className={active === 'cheque' ? 'active' : ''} onClick={() => setActive('cheque')}>พิมพ์เช็ค</button>
+        <button className={active === 'po' ? 'active' : ''} onClick={() => setActive('po')}>ใบสั่งซื้อ</button>
         <button className={active === 'reports' ? 'active' : ''} onClick={() => setActive('reports')}>รายงาน</button>
         <div className="nav-more"><button className={active === 'codes' || active === 'settings' || active === 'audit' ? 'active' : ''} aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>เพิ่มเติม ▾</button>{moreOpen && <div className="nav-more-menu"><button onClick={() => { setActive('codes'); setMoreOpen(false); }}>Cost Codes</button><button onClick={() => { setActive('settings'); setMoreOpen(false); }}>ตั้งค่าบริษัท</button><button onClick={() => { setActive('audit'); setMoreOpen(false); }}>Audit Log</button></div>}</div>
       </nav>
@@ -2453,6 +2649,7 @@ function App() {
       {active === 'wht' && <PaymentDocumentsPanel mode="wht" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
       {active === 'voucher' && <PaymentDocumentsPanel mode="voucher" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
       {active === 'cheque' && <PaymentDocumentsPanel mode="cheque" project={project} expenses={expenses} vendors={vendors} onUpdated={loadBase} />}
+      {active === 'po' && <PurchaseOrderPanel vendors={vendors} />}
       {active === 'reports' && <ReportPanel project={project} expenses={expenses} costCodes={costCodes} vendors={vendors} />}
       {active === 'settings' && <CompanySettingsPanel />}
       {active === 'audit' && <AuditPanel />}
