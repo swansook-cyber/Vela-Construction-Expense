@@ -2185,7 +2185,7 @@ function PurchaseOrderPanel({ vendors }) {
     const d=new Date();
     const yy=String(d.getFullYear()).slice(-2);
     const mm=String(d.getMonth()+1).padStart(2,'0');
-    const key=`sea-mountain-po-seq-${yy}${mm}`;
+    const key=`sea-mountain-po-seq-prod-v1-${yy}${mm}`;
     const next=Number(localStorage.getItem(key)||'0')+1;
     localStorage.setItem(key,String(next));
     return `PO-${yy}${mm}-${String(next).padStart(4,'0')}`;
