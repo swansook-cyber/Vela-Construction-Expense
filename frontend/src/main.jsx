@@ -2362,7 +2362,7 @@ function PurchaseOrderPanel({ vendors }) {
   return <section className="panel">
     <div className="section-head">
       <div><p className="section-kicker">Purchase Order</p><h2>ใบสั่งซื้อ</h2><p>สร้าง พิมพ์ และส่งร้านค้า — ไม่เก็บประวัติ PO</p></div>
-      <button className="section-add" onClick={newPo}>+ New</button>
+      {poStarted && <button className="section-add" onClick={newPo}>+ New</button>}
     </div>
 
     {!poStarted ? (
