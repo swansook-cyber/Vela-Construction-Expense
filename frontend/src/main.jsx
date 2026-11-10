@@ -204,7 +204,7 @@ function QuickExpenseModal({ projects, costCodes, vendors, onClose, onSaved }) {
           <div className="calc wide quick-summary">
             <span>ก่อน VAT <b>{money(subtotal)}</b></span>
             <span>VAT <b>{money(vat)}</b></span>
-            <span>{form.payment_status==='PAID'?'หัก ณ ที่จ่าย':'WHT เมื่อจ่าย'} <b>-{money(wht)}</b></span>
+            <span>{form.payment_status==='PAID'?'หัก ณ ที่จ่าย':'WHT เมื่อจ่าย'} <b>{wht ? `-${money(wht)}` : money(0)}</b></span>
             <span className="total-line">ยอดเอกสาร <b>{money(total)}</b></span>
             <span>จ่ายผู้ขายสุทธิ <b>{money(vendorPayable)}</b></span>
           </div>
@@ -365,7 +365,7 @@ function ExpenseModal({ projects, costCodes, vendors, existing = null, onClose, 
           <div className="calc wide">
             <span>ก่อน VAT <b>{money(subtotal)}</b></span>
             <span>VAT <b>{money(vat)}</b></span>
-            <span>หัก ณ ที่จ่าย <b>-{money(wht)}</b></span>
+            <span>หัก ณ ที่จ่าย <b>{wht ? `-${money(wht)}` : money(0)}</b></span>
             <span className="total-line">ยอดเอกสาร <b>{money(total)}</b></span>
             <span>จ่ายผู้ขายสุทธิ <b>{money(vendorPayable)}</b></span>
           </div>
@@ -2542,11 +2542,7 @@ function App() {
         .er-summary{width:50%;margin:4mm 0 0 auto;border-collapse:collapse}
         .er-summary td{border:1px solid #111;padding:2.5mm 3mm}.er-summary td:last-child{text-align:right;font-weight:700}
         .er-summary tr:last-child td{font-size:10.5px;font-weight:800}
-        .er-docs{margin-top:5mm;border:1px solid #111}
-        .er-docs .head{background:#f1f1f1;padding:2mm 3mm;font-weight:800}
-        .er-docs .body{padding:3mm;display:flex;gap:5mm;flex-wrap:wrap}
-        .er-docs .attached{margin-left:auto;font-weight:700}
-        .er-bottom{margin-top:auto}
+        .er-bottom{margin-top:auto;margin-bottom:20mm}
         .er-remark{border:1px solid #111;min-height:26mm}
         .er-remark .head{background:#f1f1f1;padding:2mm 3mm;font-weight:800}
         .er-remark .body{padding:3mm;white-space:pre-wrap}
@@ -2612,22 +2608,9 @@ function App() {
 
         <table class="er-summary">
           <tr><td>ยอดตามเอกสาร</td><td>${money(expense.total_amount)}</td></tr>
-          <tr><td>หัก ณ ที่จ่าย</td><td>- ${money(expense.withholding_tax)}</td></tr>
+          <tr><td>หัก ณ ที่จ่าย</td><td>${Number(expense.withholding_tax||0) ? `- ${money(expense.withholding_tax)}` : money(0)}</td></tr>
           <tr><td>ยอดจ่ายสุทธิ / Net Payable</td><td>${money(netPayable)}</td></tr>
         </table>
-
-        <div class="er-docs">
-          <div class="head">เอกสารแนบ / Supporting Documents</div>
-          <div class="body">
-            <span>□ ใบเสร็จรับเงิน</span>
-            <span>□ ใบกำกับภาษี</span>
-            <span>□ ใบแจ้งหนี้</span>
-            <span>□ ใบส่งของ</span>
-            <span>□ ใบวางบิล</span>
-            <span>□ อื่น ๆ</span>
-            <span class="attached">${expense.paperless_document_id ? `แนบในระบบ: DOC #${expense.paperless_document_id}` : 'ยังไม่มีเอกสารในระบบ'}</span>
-          </div>
-        </div>
 
         <div class="er-bottom">
           <div class="er-remark">
@@ -2728,7 +2711,7 @@ function App() {
     <main className="app-shell">
       <header className="app-header">
         <div className="brand-block">
-          <div className="brand-mark">SM</div>
+          <img className="brand-logo" src="/sea-mountain-adventure-logo.png" alt="Sea Mountain Zipline & ATV Adventure" />
           <div>
             <p className="eyebrow">Vela Construction Expense</p>
             <h1>{project?.name || 'Sea Mountain'}</h1>

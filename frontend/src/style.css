@@ -293,11 +293,7 @@ body{
 .app-shell{max-width:1320px;padding:32px 34px 44px}
 .app-header{margin-bottom:24px}
 .brand-block{display:flex;align-items:center;gap:16px}
-.brand-mark{
-  width:48px;height:48px;border-radius:14px;background:linear-gradient(145deg,#17212b,#314351);
-  color:#fff;display:grid;place-items:center;font-size:14px;font-weight:900;letter-spacing:.04em;
-  box-shadow:0 8px 20px rgba(23,33,43,.16)
-}
+.brand-logo{display:block;width:82px;height:62px;object-fit:contain;flex:0 0 auto}
 .app-header h1{font-size:38px;line-height:1;margin:3px 0 7px}
 .primary-action{padding:13px 18px;box-shadow:0 8px 18px rgba(23,33,43,.12)}
 .metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
@@ -368,7 +364,7 @@ body{
 }
 @media(max-width:760px){
   .app-shell{padding:16px}
-  .brand-mark{width:42px;height:42px;border-radius:12px}
+  .brand-logo{width:64px;height:48px}
   .app-header h1{font-size:30px}
   .metric-grid{grid-template-columns:1fr 1fr;gap:10px}
   .metric-card{padding:13px;gap:10px}
@@ -413,7 +409,6 @@ body{
   .danger:hover:not(:disabled) { background:#ffe7e2; }
   .app-shell { max-width:1440px; padding:30px 38px 52px; }
   .app-header { margin-bottom:22px; }
-  .brand-mark { box-shadow:none; background:#284357; border-radius:11px; }
   .app-header h1 { font-size:32px; line-height:1.15; }
   .app-header .eyebrow { color:#6c8696; letter-spacing:.12em; }
   .app-header .brand-block p:last-child { font-size:13px; }
@@ -502,7 +497,7 @@ body{
   .app-header { gap:14px; }
   .app-header h1 { font-size:25px; }
   .brand-block { gap:11px; }
-  .brand-mark { width:38px; height:38px; font-size:11px; }
+  .brand-logo { width:58px; height:44px; }
   .primary-action { width:100%; padding:11px; }
   .metric-grid { gap:8px; }
   .metric-card { padding:11px; display:block; min-width:0; }
