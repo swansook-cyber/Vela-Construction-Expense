@@ -2542,7 +2542,7 @@ function App() {
         .er-summary{width:50%;margin:4mm 0 0 auto;border-collapse:collapse}
         .er-summary td{border:1px solid #111;padding:2.5mm 3mm}.er-summary td:last-child{text-align:right;font-weight:700}
         .er-summary tr:last-child td{font-size:10.5px;font-weight:800}
-        .er-bottom{margin-top:auto;margin-bottom:20mm}
+        .er-bottom{margin-top:auto}
         .er-remark{border:1px solid #111;min-height:26mm}
         .er-remark .head{background:#f1f1f1;padding:2mm 3mm;font-weight:800}
         .er-remark .body{padding:3mm;white-space:pre-wrap}
