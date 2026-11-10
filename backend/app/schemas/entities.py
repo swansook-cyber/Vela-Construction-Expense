@@ -99,6 +99,8 @@ class DashboardSummary(BaseModel):
     project_id: int
     project_name: str
     total_expenses: Decimal
+    canceled_amount: Decimal
+    accepted_expenses: Decimal
     paid_amount: Decimal
     withholding_tax: Decimal
     outstanding_amount: Decimal
@@ -115,6 +117,8 @@ class CostCodeSummary(BaseModel):
     vat_amount: Decimal
     withholding_tax: Decimal
     total_amount: Decimal
+    canceled_amount: Decimal
+    accepted_amount: Decimal
     vendor_payable: Decimal
     paid_amount: Decimal
     outstanding_amount: Decimal

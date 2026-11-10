@@ -19,6 +19,15 @@ const api = async (path, options = {}) => {
 const money = (value) =>
   new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(Number(value || 0));
 
+const expenseReportAmounts = (expense) => {
+  const original = Number(expense.total_amount || 0);
+  const canceled = Number(expense.canceled_amount || 0);
+  const accepted = Math.max(original - canceled, 0);
+  const wht = Number(expense.withholding_tax || 0);
+  const paid = Number(expense.net_paid || 0);
+  return { original, canceled, accepted, wht, paid, outstanding: Math.max(accepted - wht - paid, 0) };
+};
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 const thaiDate = (value) => {
@@ -951,35 +960,35 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
   }), [expenses, month, costCodeId, vendorId, paymentStatus]);
 
   const totals = useMemo(() => filtered.reduce((acc, e) => {
-    const total = Number(e.total_amount || 0);
-    const wht = Number(e.withholding_tax || 0);
-    const paid = Number(e.net_paid || 0);
+    const amounts = expenseReportAmounts(e);
     acc.subtotal += Number(e.subtotal || 0);
     acc.vat += Number(e.vat_amount || 0);
-    acc.wht += wht;
-    acc.total += total;
-    acc.paid += paid;
-    acc.outstanding += Math.max(total - Number(e.canceled_amount||0) - wht - paid, 0);
+    acc.wht += amounts.wht;
+    acc.original += amounts.original;
+    acc.canceled += amounts.canceled;
+    acc.accepted += amounts.accepted;
+    acc.paid += amounts.paid;
+    acc.outstanding += amounts.outstanding;
     return acc;
-  }, { subtotal: 0, vat: 0, wht: 0, total: 0, paid: 0, outstanding: 0 }), [filtered]);
+  }, { subtotal: 0, vat: 0, wht: 0, original: 0, canceled: 0, accepted: 0, paid: 0, outstanding: 0 }), [filtered]);
 
   const grouped = useMemo(() => {
     const rows = {};
     for (const e of filtered) {
       const code = costMap[e.cost_code_id] || { code: '-', name: '-' };
       const key = String(e.cost_code_id);
-      if (!rows[key]) rows[key] = { code: code.code, name: code.name, count: 0, subtotal: 0, vat: 0, wht: 0, total: 0, paid: 0, outstanding: 0 };
+      if (!rows[key]) rows[key] = { code: code.code, name: code.name, count: 0, subtotal: 0, vat: 0, wht: 0, original: 0, canceled: 0, accepted: 0, paid: 0, outstanding: 0 };
       const row = rows[key];
-      const total = Number(e.total_amount || 0);
-      const wht = Number(e.withholding_tax || 0);
-      const paid = Number(e.net_paid || 0);
+      const amounts = expenseReportAmounts(e);
       row.count += 1;
       row.subtotal += Number(e.subtotal || 0);
       row.vat += Number(e.vat_amount || 0);
-      row.wht += wht;
-      row.total += total;
-      row.paid += paid;
-      row.outstanding += Math.max(total - Number(e.canceled_amount||0) - wht - paid, 0);
+      row.wht += amounts.wht;
+      row.original += amounts.original;
+      row.canceled += amounts.canceled;
+      row.accepted += amounts.accepted;
+      row.paid += amounts.paid;
+      row.outstanding += amounts.outstanding;
     }
     return Object.entries(rows).map(([id, row]) => ({ id, ...row })).sort((a, b) => String(a.code).localeCompare(String(b.code)));
   }, [filtered, costMap]);
@@ -1096,16 +1105,16 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
   }
 
   function exportFilteredCsv() {
-    const header = ['วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code','ผู้ขาย','ก่อน VAT','VAT','WHT','ยอดรวม','จ่ายแล้ว','ค้างจ่าย','สถานะ'];
+    const header = ['วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code','ผู้ขาย','ก่อน VAT','VAT','WHT','ยอดบิลต้นฉบับ','ยอดยกเลิก','ยอดที่ยอมรับจริง','จ่ายแล้ว','ค้างจ่าย','สถานะ'];
     const rows = filtered.map((e) => {
       const code = costMap[e.cost_code_id];
       const vendor = vendorMap[e.vendor_id];
-      const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.canceled_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
+      const amounts = expenseReportAmounts(e);
       return [
         thaiDate(e.expense_date), e.expense_no, e.document_no || '', e.description,
         code ? `${code.code} ${code.name}` : '', vendor?.name || '',
-        e.subtotal, e.vat_amount, e.withholding_tax, e.total_amount, e.net_paid,
-        outstanding.toFixed(2), e.payment_status
+        e.subtotal, e.vat_amount, amounts.wht, amounts.original, amounts.canceled, amounts.accepted, amounts.paid,
+        amounts.outstanding.toFixed(2), e.payment_status
       ];
     });
     const esc = (v) => '"' + String(v ?? '').replaceAll('"', '""') + '"';
@@ -1123,13 +1132,14 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     const header = [
       'วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code',
       'ผู้ขาย/ผู้รับเหมา','เลขประจำตัวผู้เสียภาษี','ประเภทผู้รับเงิน',
-      'ก่อน VAT','VAT','ยอดเอกสาร','WHT','จ่ายสุทธิ','สถานะ',
+      'ก่อน VAT','VAT','ยอดบิลต้นฉบับ','ยอดยกเลิก','ยอดที่ยอมรับจริง','WHT','จ่ายสุทธิ','สถานะ',
       'วิธีจ่าย','เลขที่ใบสำคัญจ่าย','เลขที่ 50 ทวิ','ธนาคาร','เลขที่เช็ค','วันที่เช็ค','หมายเหตุ'
     ];
     const rows = filtered.map((e) => {
       const code = costMap[e.cost_code_id];
       const vendor = vendorMap[e.vendor_id];
       const voucher = voucherByExpense[e.id];
+      const amounts = expenseReportAmounts(e);
       return [
         thaiDate(e.expense_date),
         e.expense_no,
@@ -1141,9 +1151,11 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
         vendor?.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : vendor?.entity_type === 'JURISTIC' ? 'นิติบุคคล' : '',
         e.subtotal,
         e.vat_amount,
-        e.total_amount,
-        e.withholding_tax,
-        voucher?.net_amount ?? e.net_paid ?? '',
+        amounts.original,
+        amounts.canceled,
+        amounts.accepted,
+        amounts.wht,
+        amounts.paid,
         e.payment_status,
         voucher?.payment_method || e.payment_method || '',
         voucher?.voucher_no || '',
@@ -1169,13 +1181,14 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     const header = [
       'วันที่','เลขรายการ','เลขที่เอกสาร','รายละเอียด','Cost Code',
       'ผู้ขาย/ผู้รับเหมา','เลขประจำตัวผู้เสียภาษี','ประเภทผู้รับเงิน',
-      'ก่อน VAT','VAT','ยอดเอกสาร','WHT','จ่ายสุทธิ','สถานะ',
+      'ก่อน VAT','VAT','ยอดบิลต้นฉบับ','ยอดยกเลิก','ยอดที่ยอมรับจริง','WHT','จ่ายสุทธิ','สถานะ',
       'วิธีจ่าย','เลขที่ใบสำคัญจ่าย','เลขที่ 50 ทวิ','ธนาคาร','เลขที่เช็ค','วันที่เช็ค','หมายเหตุ'
     ];
     const rows = filtered.map((e) => {
       const code = costMap[e.cost_code_id];
       const vendor = vendorMap[e.vendor_id];
       const voucher = voucherByExpense[e.id];
+      const amounts = expenseReportAmounts(e);
       const clean = (v) => String(v ?? '').trim();
       return [
         thaiDate(e.expense_date),
@@ -1188,9 +1201,11 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
         vendor?.entity_type === 'INDIVIDUAL' ? 'บุคคลธรรมดา' : vendor?.entity_type === 'JURISTIC' ? 'นิติบุคคล' : '',
         Number(e.subtotal || 0),
         Number(e.vat_amount || 0),
-        Number(e.total_amount || 0),
-        Number(e.withholding_tax || 0),
-        Number(voucher?.net_amount ?? e.net_paid ?? 0),
+        amounts.original,
+        amounts.canceled,
+        amounts.accepted,
+        amounts.wht,
+        amounts.paid,
         clean(e.payment_status),
         clean(voucher?.payment_method || e.payment_method),
         clean(voucher?.voucher_no),
@@ -1205,14 +1220,10 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
     ws['!freeze'] = { xSplit: 0, ySplit: 1 };
     ws['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(rows.length,1),c:header.length-1}}) };
-    ws['!cols'] = [
-      {wch:12},{wch:16},{wch:16},{wch:34},{wch:24},{wch:28},{wch:18},{wch:16},
-      {wch:14},{wch:12},{wch:14},{wch:12},{wch:14},{wch:12},{wch:14},{wch:18},
-      {wch:18},{wch:20},{wch:16},{wch:14},{wch:30}
-    ];
+    ws['!cols'] = header.map((h) => ({wch: Math.max(14, Math.min(34, h.length + 8))}));
 
     // Force identifier-like columns to text so Excel preserves leading zeros.
-    const textCols = [1,2,6,15,16,18];
+    const textCols = [1,2,6,17,18,20];
     for (let r = 1; r <= rows.length; r++) {
       for (const c of textCols) {
         const cell = ws[XLSX.utils.encode_cell({r,c})];
@@ -1222,7 +1233,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
           delete cell.w;
         }
       }
-      for (const c of [8,9,10,11,12]) {
+      for (const c of [8,9,10,11,12,13,14]) {
         const cell = ws[XLSX.utils.encode_cell({r,c})];
         if (cell) cell.z = '#,##0.00';
       }
@@ -1305,34 +1316,35 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
         {reportType === 'EXPENSE' ? (view === 'DETAIL' ? (
           <div className="table-wrap report-table-wrap">
             <table className="report-table detail-report">
-              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>เลขที่เอกสาร</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
+              <thead><tr><th>วันที่</th><th>เลขรายการ</th><th>เลขที่เอกสาร</th><th>รายละเอียด</th><th>หมวดงาน</th><th>ผู้ขาย</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดบิลต้นฉบับ</th><th>ยอดยกเลิก</th><th>ยอดที่ยอมรับจริง</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
               <tbody>
-                {filtered.length === 0 && <tr><td colSpan="12" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan="14" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
                 {filtered.map((e) => {
                   const code = costMap[e.cost_code_id];
                   const vendor = vendorMap[e.vendor_id];
-                  const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.canceled_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
+                  const amounts = expenseReportAmounts(e);
                   return <tr key={e.id}>
                     <td>{thaiDate(e.expense_date)}</td><td className="mono">{e.expense_no}</td><td>{e.document_no || '-'}</td><td>{e.description}</td>
                     <td>{code ? `${code.code} ${code.name}` : '-'}</td><td>{vendor?.name || '-'}</td>
                     <td className="amount">{money(e.subtotal)}</td><td className="amount">{money(e.vat_amount)}</td>
-                    <td className="amount">{money(e.withholding_tax)}</td><td className="amount">{money(e.total_amount)}</td>
-                    <td className="amount">{money(e.net_paid)}</td><td className="amount">{money(outstanding)}</td>
+                    <td className="amount">{money(amounts.wht)}</td><td className="amount">{money(amounts.original)}</td>
+                    <td className="amount">{money(amounts.canceled)}</td><td className="amount">{money(amounts.accepted)}</td>
+                    <td className="amount">{money(amounts.paid)}</td><td className="amount">{money(amounts.outstanding)}</td>
                   </tr>;
                 })}
               </tbody>
-              {filtered.length > 0 && <tfoot><tr><th colSpan="6">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
+              {filtered.length > 0 && <tfoot><tr><th colSpan="6">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.original)}</th><th className="amount">{money(totals.canceled)}</th><th className="amount">{money(totals.accepted)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
             </table>
           </div>
         ) : (
           <div className="table-wrap report-table-wrap">
             <table className="report-table">
-              <thead><tr><th>Cost Code</th><th>หมวดงาน</th><th>รายการ</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ต้นทุนรวม</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
+              <thead><tr><th>Cost Code</th><th>หมวดงาน</th><th>รายการ</th><th>ก่อน VAT</th><th>VAT</th><th>WHT</th><th>ยอดบิลต้นฉบับ</th><th>ยอดยกเลิก</th><th>ยอดที่ยอมรับจริง</th><th>จ่ายแล้ว</th><th>ค้างจ่าย</th></tr></thead>
               <tbody>
-                {grouped.length === 0 && <tr><td colSpan="9" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
-                {grouped.map((r) => <tr key={r.id}><td className="mono">{r.code}</td><td>{r.name}</td><td>{r.count}</td><td className="amount">{money(r.subtotal)}</td><td className="amount">{money(r.vat)}</td><td className="amount">{money(r.wht)}</td><td className="amount">{money(r.total)}</td><td className="amount">{money(r.paid)}</td><td className="amount">{money(r.outstanding)}</td></tr>)}
+                {grouped.length === 0 && <tr><td colSpan="11" className="empty">ไม่มีข้อมูลตามตัวกรอง</td></tr>}
+                {grouped.map((r) => <tr key={r.id}><td className="mono">{r.code}</td><td>{r.name}</td><td>{r.count}</td><td className="amount">{money(r.subtotal)}</td><td className="amount">{money(r.vat)}</td><td className="amount">{money(r.wht)}</td><td className="amount">{money(r.original)}</td><td className="amount">{money(r.canceled)}</td><td className="amount">{money(r.accepted)}</td><td className="amount">{money(r.paid)}</td><td className="amount">{money(r.outstanding)}</td></tr>)}
               </tbody>
-              {grouped.length > 0 && <tfoot><tr><th colSpan="3">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.total)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
+              {grouped.length > 0 && <tfoot><tr><th colSpan="3">รวม</th><th className="amount">{money(totals.subtotal)}</th><th className="amount">{money(totals.vat)}</th><th className="amount">{money(totals.wht)}</th><th className="amount">{money(totals.original)}</th><th className="amount">{money(totals.canceled)}</th><th className="amount">{money(totals.accepted)}</th><th className="amount">{money(totals.paid)}</th><th className="amount">{money(totals.outstanding)}</th></tr></tfoot>}
             </table>
           </div>
         )) : reportType === 'VAT' ? (
@@ -2791,18 +2803,20 @@ function App() {
   const dashboardSummary = useMemo(() => expenses
     .filter((e) => e.payment_status !== 'VOID')
     .reduce((acc, e) => {
-      const total = Number(e.total_amount || 0);
-      const wht = Number(e.withholding_tax || 0);
-      const paid = Number(e.net_paid || 0);
-      acc.total += total;
-      acc.wht += wht;
-      acc.paid += paid;
-      acc.outstanding += Math.max(total - Number(e.canceled_amount||0) - wht - paid, 0);
+      const amounts = expenseReportAmounts(e);
+      acc.original += amounts.original;
+      acc.canceled += amounts.canceled;
+      acc.accepted += amounts.accepted;
+      acc.wht += amounts.wht;
+      acc.paid += amounts.paid;
+      acc.outstanding += amounts.outstanding;
       return acc;
-    }, { total: 0, wht: 0, paid: 0, outstanding: 0 }), [expenses]);
+    }, { original: 0, canceled: 0, accepted: 0, wht: 0, paid: 0, outstanding: 0 }), [expenses]);
 
   const cards = [
-    ['ต้นทุนตามเอกสาร', money(dashboardSummary.total)],
+    ['ยอดบิลต้นฉบับ', money(dashboardSummary.original)],
+    ['ยอดยกเลิก', money(dashboardSummary.canceled)],
+    ['ยอดค่าใช้จ่ายที่ยอมรับจริง', money(dashboardSummary.accepted)],
     ['จ่ายผู้ขายสุทธิ', money(dashboardSummary.paid)],
     ['หัก ณ ที่จ่าย', money(dashboardSummary.wht)],
     ['ยอดค้างผู้ขาย', money(dashboardSummary.outstanding)],
@@ -2825,7 +2839,7 @@ function App() {
       {error && <div className="error banner">{error}</div>}
 
       <section className="metric-grid">
-        {cards.map(([label, value], index) => <article className="metric-card" key={label}><div className="metric-icon">{['฿','✓','%','◷'][index]}</div><div><span>{label}</span><strong>{value}</strong></div></article>)}
+        {cards.map(([label, value], index) => <article className="metric-card" key={label}><div className="metric-icon">{['฿','−','✓','฿','%','◷'][index]}</div><div><span>{label}</span><strong>{value}</strong></div></article>)}
       </section>
 
       <nav className="tabs app-nav" aria-label="เมนูหลัก">

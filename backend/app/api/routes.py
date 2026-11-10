@@ -48,6 +48,11 @@ def get_db():
         db.close()
 
 
+def expense_outstanding(expense: Expense) -> Decimal:
+    return max(Decimal(expense.total_amount or 0) - Decimal(expense.canceled_amount or 0) -
+               Decimal(expense.withholding_tax or 0) - Decimal(expense.net_paid or 0), Decimal("0"))
+
+
 def add_audit(
     db: Session,
     entity_type: str,
@@ -734,25 +739,18 @@ def dashboard(project_id: int, db: Session = Depends(get_db)):
     ).all()
 
     total = sum((Decimal(e.total_amount or 0) for e in expenses), Decimal("0"))
+    canceled = sum((Decimal(e.canceled_amount or 0) for e in expenses), Decimal("0"))
     paid = sum((Decimal(e.net_paid or 0) for e in expenses), Decimal("0"))
     withholding = sum((Decimal(e.withholding_tax or 0) for e in expenses), Decimal("0"))
-    vendor_payable = sum(
-        (
-            max(
-                Decimal(e.total_amount or 0) - Decimal(e.canceled_amount or 0) - Decimal(e.withholding_tax or 0),
-                Decimal("0"),
-            )
-            for e in expenses
-        ),
-        Decimal("0"),
-    )
-    outstanding = max(vendor_payable - paid, Decimal("0"))
+    outstanding = sum((expense_outstanding(e) for e in expenses), Decimal("0"))
     unpaid_count = sum(1 for e in expenses if e.payment_status in {"UNPAID", "PARTIAL"})
 
     return DashboardSummary(
         project_id=project.id,
         project_name=project.name,
         total_expenses=total,
+        canceled_amount=canceled,
+        accepted_expenses=total - canceled,
         paid_amount=paid,
         withholding_tax=withholding,
         outstanding_amount=outstanding,
@@ -783,6 +781,7 @@ def cost_code_report(project_id: int, db: Session = Depends(get_db)):
         vat = sum((Decimal(e.vat_amount or 0) for e in items), Decimal("0"))
         wht = sum((Decimal(e.withholding_tax or 0) for e in items), Decimal("0"))
         total = sum((Decimal(e.total_amount or 0) for e in items), Decimal("0"))
+        canceled = sum((Decimal(e.canceled_amount or 0) for e in items), Decimal("0"))
         payable = sum(
             (max(Decimal(e.total_amount or 0) - Decimal(e.canceled_amount or 0) - Decimal(e.withholding_tax or 0), Decimal("0")) for e in items),
             Decimal("0"),
@@ -798,9 +797,11 @@ def cost_code_report(project_id: int, db: Session = Depends(get_db)):
                 vat_amount=vat,
                 withholding_tax=wht,
                 total_amount=total,
+                canceled_amount=canceled,
+                accepted_amount=total - canceled,
                 vendor_payable=payable,
                 paid_amount=paid,
-                outstanding_amount=max(payable - paid, Decimal("0")),
+                outstanding_amount=sum((expense_outstanding(e) for e in items), Decimal("0")),
             )
         )
     return rows
@@ -834,6 +835,8 @@ def expense_csv(project_id: int, db: Session = Depends(get_db)):
         "VAT",
         "Withholding Tax",
         "Document Total",
+        "Canceled Amount",
+        "Accepted Amount",
         "Paid",
         "Payment Status",
         "Payment Method",
@@ -855,6 +858,8 @@ def expense_csv(project_id: int, db: Session = Depends(get_db)):
             expense.vat_amount,
             expense.withholding_tax,
             expense.total_amount,
+            expense.canceled_amount,
+            Decimal(expense.total_amount or 0) - Decimal(expense.canceled_amount or 0),
             expense.net_paid,
             expense.payment_status,
             expense.payment_method or "",

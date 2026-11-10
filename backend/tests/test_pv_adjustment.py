@@ -1,4 +1,6 @@
 import json
+import csv
+import io
 from datetime import date
 from decimal import Decimal
 
@@ -34,10 +36,10 @@ def context():
     engine.dispose()
 
 
-def seed_expense(sessions, expense_id, total="1800.00", vendor_id=1):
+def seed_expense(sessions, expense_id, total="1800.00", vendor_id=1, cost_code_id=1, expense_date=date(2026, 11, 10)):
     with sessions() as db:
-        db.add(Expense(id=expense_id, expense_no=f"EXP-2026-{expense_id:05}", project_id=1, cost_code_id=1,
-                       vendor_id=vendor_id, expense_date=date(2026, 11, 10), document_no=f"INV-{expense_id}",
+        db.add(Expense(id=expense_id, expense_no=f"EXP-2026-{expense_id:05}", project_id=1, cost_code_id=cost_code_id,
+                       vendor_id=vendor_id, expense_date=expense_date, document_no=f"INV-{expense_id}",
                        description="ค่าบริการ", subtotal=Decimal(total), vat_amount=Decimal("0"),
                        withholding_tax=Decimal("0"), total_amount=Decimal(total), canceled_amount=Decimal("0"),
                        net_paid=Decimal("0"), payment_status="UNPAID", paperless_document_id=77))
@@ -87,8 +89,40 @@ def test_1800_to_1600_preserves_invoice_and_clears_outstanding(context):
     dashboard = client.get("/api/v1/dashboard/1").json()
     assert Decimal(dashboard["outstanding_amount"]) == 0
     assert Decimal(dashboard["total_expenses"]) == 1800
+    assert Decimal(dashboard["canceled_amount"]) == 200
+    assert Decimal(dashboard["accepted_expenses"]) == 1600
     report = client.get("/api/v1/reports/1/cost-codes").json()
     assert Decimal(report[0]["outstanding_amount"]) == 0
+    assert (Decimal(report[0]["total_amount"]), Decimal(report[0]["canceled_amount"]),
+            Decimal(report[0]["accepted_amount"])) == (1800, 200, 1600)
+
+
+def test_dashboard_cost_codes_and_csv_reconcile_original_cancel_accepted(context):
+    client, sessions = context
+    with sessions() as db:
+        db.add(CostCode(id=2, code="C02", name="งานวัสดุ"))
+        db.commit()
+    seed_expense(sessions, 1)
+    seed_expense(sessions, 2, total="1000.00", cost_code_id=2, expense_date=date(2026, 10, 10))
+    voucher = create_voucher(client, [{"expense_id": 1, "gross_amount": "1800.00", "withholding_tax": "0"}])
+    response = adjust(client, voucher["id"], [{"expense_id": 1, "gross_amount": "1600.00",
+                                               "withholding_tax": "0", "canceled_amount": "200.00"}])
+    assert response.status_code == 200, response.text
+    dashboard = client.get("/api/v1/dashboard/1").json()
+    assert (Decimal(dashboard["total_expenses"]), Decimal(dashboard["canceled_amount"]),
+            Decimal(dashboard["accepted_expenses"]), Decimal(dashboard["outstanding_amount"])) == (2800, 200, 2600, 1000)
+    rows = client.get("/api/v1/reports/1/cost-codes").json()
+    by_code = {row["code"]: row for row in rows}
+    assert (Decimal(by_code["C01"]["total_amount"]), Decimal(by_code["C01"]["canceled_amount"]),
+            Decimal(by_code["C01"]["accepted_amount"])) == (1800, 200, 1600)
+    assert (Decimal(by_code["C02"]["total_amount"]), Decimal(by_code["C02"]["canceled_amount"]),
+            Decimal(by_code["C02"]["accepted_amount"])) == (1000, 0, 1000)
+    exported = list(csv.DictReader(io.StringIO(client.get("/api/v1/reports/1/expenses.csv").text.lstrip("\ufeff"))))
+    by_document = {row["Document No"]: row for row in exported}
+    assert by_document["INV-1"]["Document Total"] == "1800.00"
+    assert by_document["INV-1"]["Canceled Amount"] == "200.00"
+    assert by_document["INV-1"]["Accepted Amount"] == "1600.00"
+    assert by_document["INV-2"]["Accepted Amount"] == "1000.00"
 
 
 def test_installments_and_other_vouchers_are_unchanged(context):
@@ -180,7 +214,11 @@ def test_wht_reduction_keeps_certificate_number_and_reconciles_expense(context):
         assert details["tax_reconciliation_required"] is True
         assert details["expense_balances"]["1"]["old"]["withholding_tax"] == "54.00"
         assert details["expense_balances"]["1"]["new"]["withholding_tax"] == "48.00"
-    assert Decimal(client.get("/api/v1/dashboard/1").json()["outstanding_amount"]) == 0
+    dashboard = client.get("/api/v1/dashboard/1").json()
+    assert (Decimal(dashboard["accepted_expenses"]), Decimal(dashboard["outstanding_amount"])) == (1600, 0)
+    report = client.get("/api/v1/reports/1/cost-codes").json()[0]
+    assert (Decimal(report["accepted_amount"]), Decimal(report["vendor_payable"]),
+            Decimal(report["paid_amount"]), Decimal(report["outstanding_amount"])) == (1600, 1552, 1552, 0)
 
 
 def test_removed_bill_returns_to_unpaid_without_touching_other_vouchers(context):
