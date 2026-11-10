@@ -2,7 +2,7 @@ import csv
 import io
 import json
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
@@ -26,6 +26,7 @@ from app.schemas.entities import (
     ExpenseUpdate,
     ExpenseVoid,
     PaymentVoucherCreate,
+    PaymentVoucherAdjustment,
     PaymentVoucherOut,
     PaymentVoucherPaymentUpdate,
     ProjectOut,
@@ -78,6 +79,7 @@ def expense_snapshot(expense: Expense) -> dict[str, Any]:
         "vat_amount": str(expense.vat_amount),
         "withholding_tax": str(expense.withholding_tax),
         "total_amount": str(expense.total_amount),
+        "canceled_amount": str(expense.canceled_amount),
         "net_paid": str(expense.net_paid),
         "payment_status": expense.payment_status,
         "payment_method": expense.payment_method,
@@ -410,7 +412,7 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         normalized.append((expense_id, gross, wht))
 
     expense_ids = [row[0] for row in normalized]
-    expenses = db.scalars(select(Expense).where(Expense.id.in_(expense_ids))).all()
+    expenses = db.scalars(select(Expense).where(Expense.id.in_(expense_ids)).order_by(Expense.id).with_for_update()).all()
     if len(expenses) != len(expense_ids):
         raise HTTPException(status_code=404, detail="One or more expenses were not found")
     expense_map = {expense.id: expense for expense in expenses}
@@ -444,7 +446,7 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
                 Decimal(expense.net_paid or 0) + Decimal(expense.withholding_tax or 0),
             )
         already_allocated = max(allocated_gross, manual_gross)
-        remaining = max(Decimal(expense.total_amount or 0) - already_allocated, Decimal("0"))
+        remaining = max(Decimal(expense.total_amount or 0) - Decimal(expense.canceled_amount or 0) - already_allocated, Decimal("0"))
         if gross > remaining + Decimal("0.01"):
             raise HTTPException(
                 status_code=400,
@@ -467,6 +469,8 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         raise HTTPException(status_code=400, detail="Cheque payment requires bank name, cheque number and cheque date")
 
     voucher_data = payload.model_dump(exclude={"expense_ids", "allocations"})
+    voucher_data["payment_date"] = payload.payment_date or payload.voucher_date
+    voucher_data["wht_issue_date"] = payload.wht_issue_date or voucher_data["payment_date"] if withholding_tax > 0 else None
     voucher_data["expense_id"] = expense_ids[0]  # legacy primary reference
     voucher = PaymentVoucher(
         voucher_no=next_voucher_no(db, payload.voucher_date),
@@ -488,7 +492,7 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         )
 
         previous_items = db.scalars(
-            select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense.id)
+            select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense.id, PaymentVoucherItem.voucher_id != voucher.id)
         ).all()
         if previous_items:
             baseline_gross = sum((Decimal(item.gross_amount or 0) for item in previous_items), Decimal("0"))
@@ -506,7 +510,7 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
         expense.withholding_tax = cumulative_wht
         expense.net_paid = cumulative_net
         expense.payment_method = payload.payment_method
-        expense.payment_status = "PAID" if cumulative_gross >= Decimal(expense.total_amount or 0) - Decimal("0.01") else "PARTIAL"
+        expense.payment_status = "PAID" if cumulative_gross >= Decimal(expense.total_amount or 0) - Decimal(expense.canceled_amount or 0) - Decimal("0.01") else "PARTIAL"
         expense.updated_at = datetime.utcnow()
 
     add_audit(
@@ -540,12 +544,17 @@ def create_payment_voucher(payload: PaymentVoucherCreate, db: Session = Depends(
 
 @router.put("/payment-vouchers/{voucher_id}/payment", response_model=PaymentVoucherOut)
 def update_payment_voucher_payment(voucher_id: int, payload: PaymentVoucherPaymentUpdate, db: Session = Depends(get_db)):
+    if len(payload.reason.strip()) < 3:
+        raise HTTPException(status_code=400, detail="A meaningful reason is required")
     voucher = db.get(PaymentVoucher, voucher_id)
     if not voucher:
         raise HTTPException(status_code=404, detail="Payment voucher not found")
     if payload.payment_method == "CHEQUE" and (not payload.bank_name or not payload.cheque_no or not payload.cheque_date):
         raise HTTPException(status_code=400, detail="Cheque payment requires bank name, cheque number and cheque date")
 
+    old = {"payment_method": voucher.payment_method, "cheque_no": voucher.cheque_no,
+           "cheque_date": voucher.cheque_date, "bank_name": voucher.bank_name,
+           "billing_note_no": voucher.billing_note_no, "notes": voucher.notes}
     voucher.payment_method = payload.payment_method
     voucher.cheque_no = payload.cheque_no if payload.payment_method == "CHEQUE" else None
     voucher.cheque_date = payload.cheque_date if payload.payment_method == "CHEQUE" else None
@@ -554,10 +563,157 @@ def update_payment_voucher_payment(voucher_id: int, payload: PaymentVoucherPayme
     voucher.notes = payload.notes
     voucher.updated_at = datetime.utcnow()
     add_audit(db, "payment_voucher", voucher.id, "UPDATE_PAYMENT", {
-        "payment_method": voucher.payment_method,
-        "cheque_no": voucher.cheque_no,
-        "cheque_date": voucher.cheque_date,
-        "bank_name": voucher.bank_name,
+        "old": old,
+        "new": {"payment_method": voucher.payment_method, "cheque_no": voucher.cheque_no,
+                "cheque_date": voucher.cheque_date, "bank_name": voucher.bank_name,
+                "billing_note_no": voucher.billing_note_no, "notes": voucher.notes},
+        "reason": payload.reason.strip(),
+    })
+    db.commit()
+    db.refresh(voucher)
+    return voucher
+
+
+@router.put("/payment-vouchers/{voucher_id}/adjustment", response_model=PaymentVoucherOut)
+def adjust_payment_voucher(voucher_id: int, payload: PaymentVoucherAdjustment, db: Session = Depends(get_db)):
+    """Revise one issued PV and its expense balances in a single transaction."""
+    if len(payload.reason.strip()) < 3:
+        raise HTTPException(status_code=400, detail="A meaningful reason is required")
+    cent = Decimal("0.01")
+
+    def amount(value: Decimal) -> Decimal:
+        value = Decimal(value)
+        if not value.is_finite():
+            raise HTTPException(status_code=400, detail="Invalid monetary amount")
+        return value.quantize(cent, rounding=ROUND_HALF_UP)
+
+    voucher = db.scalar(select(PaymentVoucher).where(PaymentVoucher.id == voucher_id).with_for_update())
+    if not voucher:
+        raise HTTPException(status_code=404, detail="Payment voucher not found")
+    if voucher.status != "ISSUED":
+        raise HTTPException(status_code=409, detail="Only issued vouchers can be revised")
+
+    old_items = list(voucher.items)
+    old_ids = {item.expense_id for item in old_items}
+    if len(old_ids) != len(old_items):
+        raise HTTPException(status_code=409, detail="Existing voucher has duplicate allocations")
+    proposed = {}
+    for row in payload.allocations:
+        if row.expense_id in proposed:
+            raise HTTPException(status_code=400, detail="Duplicate expense allocation")
+        gross, wht, canceled = amount(row.gross_amount), amount(row.withholding_tax), amount(row.canceled_amount)
+        if gross <= 0 or wht < 0 or wht > gross or canceled < 0:
+            raise HTTPException(status_code=400, detail="Invalid allocation amounts")
+        proposed[row.expense_id] = (gross, wht, canceled)
+
+    affected_ids = old_ids | set(proposed)
+    expenses = db.scalars(select(Expense).where(Expense.id.in_(affected_ids)).order_by(Expense.id).with_for_update()).all()
+    if len(expenses) != len(affected_ids):
+        raise HTTPException(status_code=404, detail="One or more expenses were not found")
+    expense_map = {expense.id: expense for expense in expenses}
+    if any(expense.payment_status == "VOID" or expense.project_id != voucher.project_id or expense.vendor_id != voucher.vendor_id for expense in expenses):
+        raise HTTPException(status_code=400, detail="Expense project/vendor mismatch or voided expense")
+
+    all_items = db.scalars(select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id.in_(affected_ids)).with_for_update()).all()
+    by_expense = {expense_id: [] for expense_id in affected_ids}
+    for item in all_items:
+        by_expense[item.expense_id].append(item)
+
+    baselines = {}
+    old_balances = {}
+    for expense in expenses:
+        old_balances[expense.id] = {"expense_no": expense.expense_no, "invoice_total": str(expense.total_amount),
+                                    "canceled_amount": str(expense.canceled_amount), "net_paid": str(expense.net_paid),
+                                    "withholding_tax": str(expense.withholding_tax), "status": expense.payment_status}
+        existing = by_expense[expense.id]
+        item_net = sum((Decimal(item.net_amount or 0) for item in existing), Decimal("0"))
+        item_wht = sum((Decimal(item.withholding_tax or 0) for item in existing), Decimal("0"))
+        item_canceled = sum((Decimal(item.canceled_amount or 0) for item in existing), Decimal("0"))
+        manual_net = max(Decimal(expense.net_paid or 0) - item_net, Decimal("0"))
+        manual_wht = max(Decimal(expense.withholding_tax or 0) - item_wht, Decimal("0"))
+        manual_canceled = max(Decimal(expense.canceled_amount or 0) - item_canceled, Decimal("0"))
+        baselines[expense.id] = (manual_net, manual_wht, manual_canceled)
+        others = [item for item in existing if item.voucher_id != voucher.id]
+        proposed_gross, _, proposed_canceled = proposed.get(expense.id, (Decimal("0"), Decimal("0"), Decimal("0")))
+        committed = manual_net + manual_wht + manual_canceled + sum(
+            (Decimal(item.gross_amount or 0) + Decimal(item.canceled_amount or 0) for item in others), Decimal("0")
+        )
+        if committed + proposed_gross + proposed_canceled > Decimal(expense.total_amount or 0):
+            raise HTTPException(status_code=400, detail=f"Allocation exceeds accepted balance for {expense.expense_no}")
+
+    new_gross = sum((row[0] for row in proposed.values()), Decimal("0"))
+    new_wht = sum((row[1] for row in proposed.values()), Decimal("0"))
+    new_canceled = sum((row[2] for row in proposed.values()), Decimal("0"))
+    old_snapshot = {
+        "voucher_no": voucher.voucher_no,
+        "gross_amount": str(voucher.gross_amount), "withholding_tax": str(voucher.withholding_tax),
+        "net_amount": str(voucher.net_amount), "canceled_amount": str(voucher.canceled_amount),
+        "payment_date": voucher.payment_date, "wht_issue_date": voucher.wht_issue_date,
+        "wht_certificate_no": voucher.wht_certificate_no,
+        "allocations": [{"expense_id": item.expense_id, "gross_amount": str(item.gross_amount),
+                         "withholding_tax": str(item.withholding_tax), "canceled_amount": str(item.canceled_amount)} for item in old_items],
+    }
+    if voucher.wht_certificate_no and new_wht == 0:
+        raise HTTPException(status_code=409, detail="Issued WHT certificate cannot be silently removed; reconcile tax first")
+
+    old_by_expense = {item.expense_id: item for item in old_items}
+    for expense_id, (gross, wht, canceled) in proposed.items():
+        item = old_by_expense.pop(expense_id, None)
+        if item is None:
+            item = PaymentVoucherItem(voucher_id=voucher.id, expense_id=expense_id)
+            db.add(item)
+        item.gross_amount = gross
+        item.withholding_tax = wht
+        item.net_amount = gross - wht
+        item.canceled_amount = canceled
+    for item in old_by_expense.values():
+        db.delete(item)
+    db.flush()
+
+    voucher.expense_id = next(iter(proposed))
+    voucher.gross_amount = new_gross
+    voucher.withholding_tax = new_wht
+    voucher.net_amount = new_gross - new_wht
+    voucher.canceled_amount = new_canceled
+    voucher.payment_date = payload.payment_date
+    voucher.wht_issue_date = (payload.wht_issue_date or payload.payment_date) if new_wht > 0 else None
+    voucher.adjustment_reason = payload.reason.strip()
+    if new_wht > 0 and not voucher.wht_certificate_no:
+        voucher.wht_certificate_no = next_wht_no(db, payload.payment_date)
+    tax_base = sum(
+        (gross * Decimal(expense_map[expense_id].subtotal or 0) / Decimal(expense_map[expense_id].total_amount or 1)
+         for expense_id, (gross, _, _) in proposed.items()), Decimal("0")
+    )
+    voucher.wht_rate = (new_wht / tax_base * 100).quantize(cent, rounding=ROUND_HALF_UP) if tax_base else Decimal("0")
+    voucher.updated_at = datetime.utcnow()
+
+    for expense in expenses:
+        manual_net, manual_wht, manual_canceled = baselines[expense.id]
+        current = db.scalars(select(PaymentVoucherItem).where(PaymentVoucherItem.expense_id == expense.id)).all()
+        gross = manual_net + manual_wht + sum((Decimal(item.gross_amount or 0) for item in current), Decimal("0"))
+        expense.net_paid = manual_net + sum((Decimal(item.net_amount or 0) for item in current), Decimal("0"))
+        expense.withholding_tax = manual_wht + sum((Decimal(item.withholding_tax or 0) for item in current), Decimal("0"))
+        expense.canceled_amount = manual_canceled + sum((Decimal(item.canceled_amount or 0) for item in current), Decimal("0"))
+        accepted = Decimal(expense.total_amount or 0) - expense.canceled_amount
+        expense.payment_status = "PAID" if gross >= accepted else ("PARTIAL" if gross > 0 else "UNPAID")
+        expense.updated_at = datetime.utcnow()
+
+    new_snapshot = {
+        "voucher_no": voucher.voucher_no,
+        "gross_amount": str(voucher.gross_amount), "withholding_tax": str(voucher.withholding_tax),
+        "net_amount": str(voucher.net_amount), "canceled_amount": str(voucher.canceled_amount),
+        "payment_date": voucher.payment_date, "wht_issue_date": voucher.wht_issue_date,
+        "wht_certificate_no": voucher.wht_certificate_no,
+        "allocations": [{"expense_id": expense_id, "gross_amount": str(gross), "withholding_tax": str(wht),
+                         "canceled_amount": str(canceled)} for expense_id, (gross, wht, canceled) in proposed.items()],
+    }
+    add_audit(db, "payment_voucher", voucher.id, "ADJUST", {
+        "old": old_snapshot, "new": new_snapshot, "reason": payload.reason.strip(),
+        "expense_balances": {expense.id: {"old": old_balances[expense.id],
+                          "new": {"invoice_total": str(expense.total_amount), "canceled_amount": str(expense.canceled_amount),
+                                  "net_paid": str(expense.net_paid), "withholding_tax": str(expense.withholding_tax),
+                                  "status": expense.payment_status}} for expense in expenses},
+        "tax_reconciliation_required": bool(old_snapshot["wht_certificate_no"] and old_snapshot != new_snapshot),
     })
     db.commit()
     db.refresh(voucher)
@@ -583,7 +739,7 @@ def dashboard(project_id: int, db: Session = Depends(get_db)):
     vendor_payable = sum(
         (
             max(
-                Decimal(e.total_amount or 0) - Decimal(e.withholding_tax or 0),
+                Decimal(e.total_amount or 0) - Decimal(e.canceled_amount or 0) - Decimal(e.withholding_tax or 0),
                 Decimal("0"),
             )
             for e in expenses
@@ -628,7 +784,7 @@ def cost_code_report(project_id: int, db: Session = Depends(get_db)):
         wht = sum((Decimal(e.withholding_tax or 0) for e in items), Decimal("0"))
         total = sum((Decimal(e.total_amount or 0) for e in items), Decimal("0"))
         payable = sum(
-            (max(Decimal(e.total_amount or 0) - Decimal(e.withholding_tax or 0), Decimal("0")) for e in items),
+            (max(Decimal(e.total_amount or 0) - Decimal(e.canceled_amount or 0) - Decimal(e.withholding_tax or 0), Decimal("0")) for e in items),
             Decimal("0"),
         )
         paid = sum((Decimal(e.net_paid or 0) for e in items), Decimal("0"))

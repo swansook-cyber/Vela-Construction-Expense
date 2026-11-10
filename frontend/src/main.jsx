@@ -959,7 +959,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     acc.wht += wht;
     acc.total += total;
     acc.paid += paid;
-    acc.outstanding += Math.max(total - wht - paid, 0);
+    acc.outstanding += Math.max(total - Number(e.canceled_amount||0) - wht - paid, 0);
     return acc;
   }, { subtotal: 0, vat: 0, wht: 0, total: 0, paid: 0, outstanding: 0 }), [filtered]);
 
@@ -979,7 +979,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
       row.wht += wht;
       row.total += total;
       row.paid += paid;
-      row.outstanding += Math.max(total - wht - paid, 0);
+      row.outstanding += Math.max(total - Number(e.canceled_amount||0) - wht - paid, 0);
     }
     return Object.entries(rows).map(([id, row]) => ({ id, ...row })).sort((a, b) => String(a.code).localeCompare(String(b.code)));
   }, [filtered, costMap]);
@@ -1000,7 +1000,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
 
   const whtRows = useMemo(() => vouchers.filter((v) => {
     if (Number(v.withholding_tax || 0) <= 0) return false;
-    if (month && !String(v.voucher_date || '').startsWith(month)) return false;
+    if (month && !String(v.payment_date || v.voucher_date || '').startsWith(month)) return false;
     const vendor = vendorMap[v.vendor_id];
     if (reportType === 'WHT3' && vendor?.entity_type !== 'INDIVIDUAL') return false;
     if (reportType === 'WHT53' && vendor?.entity_type !== 'JURISTIC') return false;
@@ -1056,7 +1056,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     if (reportType === 'WHT3' || reportType === 'WHT53') {
       header = ['วันที่จ่าย','เลขที่ 50 ทวิ','ผู้รับเงิน','เลขประจำตัวผู้เสียภาษี','ประเภทเงินได้','ฐานภาษี','อัตรา WHT (%)','ภาษีหัก ณ ที่จ่าย','เลขที่ใบสำคัญจ่าย','เลขที่เอกสาร'];
       rows = whtRows.map((r) => [
-        thaiDate(r.voucher.voucher_date),
+        thaiDate(r.voucher.payment_date || r.voucher.voucher_date),
         String(r.voucher.wht_certificate_no || '').trim(),
         String(r.vendor?.name || r.voucher.payee_name || '').trim(),
         String(r.vendor?.tax_id || '').trim(),
@@ -1100,7 +1100,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
     const rows = filtered.map((e) => {
       const code = costMap[e.cost_code_id];
       const vendor = vendorMap[e.vendor_id];
-      const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
+      const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.canceled_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
       return [
         thaiDate(e.expense_date), e.expense_no, e.document_no || '', e.description,
         code ? `${code.code} ${code.name}` : '', vendor?.name || '',
@@ -1311,7 +1311,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
                 {filtered.map((e) => {
                   const code = costMap[e.cost_code_id];
                   const vendor = vendorMap[e.vendor_id];
-                  const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
+                  const outstanding = Math.max(Number(e.total_amount || 0) - Number(e.canceled_amount || 0) - Number(e.withholding_tax || 0) - Number(e.net_paid || 0), 0);
                   return <tr key={e.id}>
                     <td>{thaiDate(e.expense_date)}</td><td className="mono">{e.expense_no}</td><td>{e.document_no || '-'}</td><td>{e.description}</td>
                     <td>{code ? `${code.code} ${code.name}` : '-'}</td><td>{vendor?.name || '-'}</td>
@@ -1353,7 +1353,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
               <thead><tr><th>วันที่จ่าย</th><th>เลขที่ 50 ทวิ</th><th>ผู้รับเงิน</th><th>Tax ID</th><th>ประเภทเงินได้</th><th>ฐานภาษี</th><th>อัตรา</th><th>WHT</th><th>PV</th></tr></thead>
               <tbody>
                 {whtRows.length === 0 && <tr><td colSpan="9" className="empty">ไม่มีรายการหัก ณ ที่จ่ายตามช่วงเวลาที่เลือก</td></tr>}
-                {whtRows.map((r) => <tr key={r.voucher.id}><td>{thaiDate(r.voucher.voucher_date)}</td><td>{r.voucher.wht_certificate_no || '-'}</td><td>{r.vendor?.name || r.voucher.payee_name}</td><td className="mono">{r.vendor?.tax_id || '-'}</td><td>{r.voucher.income_type || r.expense?.description || '-'}</td><td className="amount">{money(r.base)}</td><td className="amount">{r.rate.toFixed(2)}%</td><td className="amount">{money(r.tax)}</td><td>{r.voucher.voucher_no}</td></tr>)}
+                {whtRows.map((r) => <tr key={r.voucher.id}><td>{thaiDate(r.voucher.payment_date || r.voucher.voucher_date)}</td><td>{r.voucher.wht_certificate_no || '-'}</td><td>{r.vendor?.name || r.voucher.payee_name}</td><td className="mono">{r.vendor?.tax_id || '-'}</td><td>{r.voucher.income_type || r.expense?.description || '-'}</td><td className="amount">{money(r.base)}</td><td className="amount">{r.rate.toFixed(2)}%</td><td className="amount">{money(r.tax)}</td><td>{r.voucher.voucher_no}</td></tr>)}
               </tbody>
               {whtRows.length > 0 && <tfoot><tr><th colSpan="5">รวม</th><th className="amount">{money(whtTotals.base)}</th><th></th><th className="amount">{money(whtTotals.tax)}</th><th></th></tr></tfoot>}
             </table>
@@ -1465,7 +1465,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
     const manualGross = prior.length ? 0 : Math.min(total, Number(e.net_paid||0) + Number(e.withholding_tax||0));
     const paidGross = Math.max(allocatedGross, manualGross);
     const paidWht = prior.length ? allocatedWht : Number(e.withholding_tax||0);
-    const remaining = Math.max(total-paidGross,0);
+    const remaining = Math.max(total-Number(e.canceled_amount||0)-paidGross,0);
     const priorTaxBase = prior.reduce((sum,a)=>sum + (total ? Number(a.gross_amount||0) * subtotal / total : Number(a.gross_amount||0)),0);
     const inferredRate = priorTaxBase > 0
       ? paidWht / priorTaxBase * 100
@@ -1488,6 +1488,8 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
   const [drafts,setDrafts]=useState(() => vendorExpenses[0] ? {[vendorExpenses[0].id]:makeDraft(vendorExpenses[0])} : {});
   const [form, setForm] = useState({
     voucher_date: today(),
+    payment_date: today(),
+    wht_issue_date: today(),
     payment_method: 'TRANSFER',
     payee_name: vendor?.name || '',
     cheque_no: '',
@@ -1553,6 +1555,8 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
           })),
           vendor_id: vendor.id,
           voucher_date: form.voucher_date,
+          payment_date: form.payment_date,
+          wht_issue_date: wht > 0 ? form.wht_issue_date : null,
           gross_amount: gross.toFixed(2),
           withholding_tax: wht.toFixed(2),
           wht_rate: null,
@@ -1609,6 +1613,12 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
         </div>
 
         <label>วันที่ใบสำคัญจ่าย<input type="date" value={form.voucher_date} onChange={(e)=>set('voucher_date',e.target.value)} required /></label>
+        <label>วันที่จ่ายเงินจริง<input type="date" value={form.payment_date} onChange={(e)=>setForm((current)=>({
+          ...current,
+          payment_date: e.target.value,
+          wht_issue_date: current.wht_issue_date === current.payment_date ? e.target.value : current.wht_issue_date,
+        }))} required /></label>
+        {wht > 0 && <label>วันที่ออก 50 ทวิ<input type="date" value={form.wht_issue_date} onChange={(e)=>set('wht_issue_date',e.target.value)} required /></label>}
         <label>ผู้รับเงิน<input value={form.payee_name} onChange={(e)=>set('payee_name',e.target.value)} required /></label>
         <label>วิธีจ่าย
           <select value={form.payment_method} onChange={(e)=>set('payment_method',e.target.value)}>
@@ -1648,7 +1658,8 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
     cheque_no:voucher.cheque_no||'',
     cheque_date:voucher.cheque_date||today(),
     billing_note_no:voucher.billing_note_no||'',
-    notes:voucher.notes||''
+    notes:voucher.notes||'',
+    reason:''
   });
   const [error,setError]=useState('');
   const set=(k,v)=>setForm((x)=>({...x,[k]:v}));
@@ -1663,7 +1674,8 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
           cheque_no:form.payment_method==='CHEQUE'?(form.cheque_no||null):null,
           cheque_date:form.payment_method==='CHEQUE'?form.cheque_date:null,
           billing_note_no:form.billing_note_no?.trim()||null,
-          notes:form.notes||null
+          notes:form.notes||null,
+          reason:form.reason.trim()
         })
       });
       await onSaved();
@@ -1688,8 +1700,95 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
         </>}
         <label>เลขที่ใบวางบิล<input value={form.billing_note_no} onChange={(e)=>set('billing_note_no',e.target.value)} /></label>
         <label className="wide">หมายเหตุ<textarea rows="2" value={form.notes} onChange={(e)=>set('notes',e.target.value)} /></label>
+        <label className="wide">เหตุผลการแก้ข้อมูลการจ่าย<textarea rows="2" minLength="3" required value={form.reason} onChange={(e)=>set('reason',e.target.value)} /></label>
         {error&&<div className="error wide">{error}</div>}
         <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button>บันทึกการจ่าย</button></div>
+      </form>
+    </div>
+  </div>;
+}
+
+function PaymentAdjustmentModal({ voucher, expenses, vouchers, onClose, onSaved }) {
+  const expenseMap = Object.fromEntries(expenses.map((e) => [e.id, e]));
+  const [rows, setRows] = useState(() => (voucher.allocations || []).map((a) => ({
+    expense_id: a.expense_id, gross_amount: String(a.gross_amount),
+    withholding_tax: String(a.withholding_tax), canceled_amount: String(a.canceled_amount || 0),
+  })));
+  const [paymentDate, setPaymentDate] = useState(voucher.payment_date || voucher.voucher_date);
+  const [whtIssueDate, setWhtIssueDate] = useState(voucher.wht_issue_date || voucher.payment_date || voucher.voucher_date);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const change = (id, key, value) => setRows((current) => current.map((row) => {
+    if (row.expense_id !== id) return row;
+    const next = {...row, [key]: value};
+    if (key === 'gross_amount') {
+      const original = (voucher.allocations || []).find((a) => a.expense_id === id);
+      const expense = expenseMap[id];
+      const baseRatio = Number(expense?.total_amount || 0) ? Number(expense?.subtotal || 0) / Number(expense.total_amount) : 1;
+      const oldBase = Number(original?.gross_amount || 0) * baseRatio;
+      const rate = oldBase ? Number(original?.withholding_tax || 0) / oldBase : 0;
+      next.withholding_tax = (Math.round(Number(value || 0) * baseRatio * rate * 100) / 100).toFixed(2);
+    }
+    return next;
+  }));
+  const gross = rows.reduce((sum, row) => sum + Number(row.gross_amount || 0), 0);
+  const wht = rows.reduce((sum, row) => sum + Number(row.withholding_tax || 0), 0);
+  const canceled = rows.reduce((sum, row) => sum + Number(row.canceled_amount || 0), 0);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    try {
+      await api(`/payment-vouchers/${voucher.id}/adjustment`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          allocations: rows.map((row) => ({
+            expense_id: row.expense_id,
+            gross_amount: Number(row.gross_amount || 0).toFixed(2),
+            withholding_tax: Number(row.withholding_tax || 0).toFixed(2),
+            canceled_amount: Number(row.canceled_amount || 0).toFixed(2),
+          })),
+          payment_date: paymentDate,
+          wht_issue_date: wht > 0 ? whtIssueDate : null,
+          reason: reason.trim(),
+        }),
+      });
+      await onSaved();
+    } catch (err) { setError(err.message); }
+  }
+
+  return <div className="modal-backdrop" onMouseDown={onClose}>
+    <div className="modal" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="modal-head"><div><p className="eyebrow">Payment Voucher</p><h2>แก้ไข PV</h2><p>{voucher.voucher_no} · เลขที่เดิมคงไว้</p></div><button className="ghost icon" onClick={onClose}>×</button></div>
+      <form onSubmit={submit} className="form-grid">
+        <div className="wide info-message">ยอดบิลต้นฉบับและเอกสารแนบยังคงเดิม ยอดยกเลิกเป็นการปรับถาวร กรุณาระบุเหตุผลและเก็บหลักฐานประกอบ{voucher.wht_certificate_no ? ' · มี 50 ทวิออกแล้ว ต้องตรวจการกระทบยอดภาษีหลังแก้ไข' : ''}</div>
+        {voucher.adjustment_reason && <div className="wide info-message">เหตุผลการแก้ไขครั้งก่อน: {voucher.adjustment_reason}</div>}
+        {rows.map((row) => {
+          const expense = expenseMap[row.expense_id];
+          const otherCommitted = vouchers.filter((v) => v.id !== voucher.id).flatMap((v) => v.allocations || [])
+            .filter((a) => a.expense_id === row.expense_id)
+            .reduce((sum, a) => sum + Number(a.gross_amount || 0) + Number(a.canceled_amount || 0), 0);
+          const original = Number(expense?.total_amount || 0);
+          const otherCanceled = vouchers.filter((v) => v.id !== voucher.id).flatMap((v) => v.allocations || [])
+            .filter((a) => a.expense_id === row.expense_id).reduce((sum, a) => sum + Number(a.canceled_amount || 0), 0);
+          const remaining = Math.max(original - otherCommitted, 0);
+          return <div className="wide voucher-installment-row" key={row.expense_id}>
+            <b>{expense?.document_no || expense?.expense_no || row.expense_id}</b>
+            <div className="voucher-balance"><span>ยอดบิลต้นฉบับ</span><b>{money(original)}</b><span>จัดสรร/ยกเลิกใน PV อื่น</span><b>{money(otherCommitted)}</b><span>วงเงินสำหรับ PV นี้</span><b>{money(remaining)}</b></div>
+            <div className="voucher-installment-inputs">
+              <label>ยอดรับจริง / จ่ายงวดนี้<input type="number" min="0.01" max={remaining} step="0.01" value={row.gross_amount} onChange={(e) => change(row.expense_id, 'gross_amount', e.target.value)} required /></label>
+              <label>ยอดยกเลิกถาวร<input type="number" min="0" max={remaining} step="0.01" value={row.canceled_amount} onChange={(e) => change(row.expense_id, 'canceled_amount', e.target.value)} required /></label>
+              <label>WHT งวดนี้<input type="number" min="0" step="0.01" value={row.withholding_tax} onChange={(e) => change(row.expense_id, 'withholding_tax', e.target.value)} required /></label>
+            </div>
+            <small>ยอดยอมรับหลังยกเลิก: {money(original - otherCanceled - Number(row.canceled_amount || 0))}</small>
+          </div>;
+        })}
+        <div className="calc wide"><span>ยอดจ่ายตาม PV <b>{money(gross)}</b></span><span>ยอดยกเลิก <b>{money(canceled)}</b></span><span>WHT <b>{money(wht)}</b></span><span className="total-line">จ่ายสุทธิ <b>{money(gross - wht)}</b></span></div>
+        <label>วันที่จ่ายเงินจริง<input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required /></label>
+        <label>วันที่ออก 50 ทวิ<input type="date" value={whtIssueDate} onChange={(e) => setWhtIssueDate(e.target.value)} disabled={wht <= 0} required={wht > 0} /></label>
+        <label className="wide">เหตุผลการแก้ไข / หลักฐานอ้างอิง<textarea value={reason} onChange={(e) => setReason(e.target.value)} minLength="3" required rows="3" /></label>
+        {error && <div className="error wide">{error}</div>}
+        <div className="actions wide"><button type="button" className="ghost" onClick={onClose}>ยกเลิก</button><button>บันทึกการแก้ไข PV</button></div>
       </form>
     </div>
   </div>;
@@ -1826,6 +1925,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
   const [company,setCompany]=useState(null);
   const [showCreate,setShowCreate]=useState(false);
   const [editingPayment,setEditingPayment]=useState(null);
+  const [editingVoucher,setEditingVoucher]=useState(null);
   const [previewCheque,setPreviewCheque]=useState(null);
   const expenseMap=useMemo(()=>Object.fromEntries(expenses.map((e)=>[e.id,e])),[expenses]);
 
@@ -1898,7 +1998,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       </div>
       <div class="payment-row">
         <div><b>วันที่เช็ค:</b> ${v.cheque_date?thaiDate(v.cheque_date):'-'}</div>
-        <div><b>จำนวนบิล:</b> ${voucherExpenses.length || 1} รายการ</div>
+        <div><b>วันที่จ่ายจริง:</b> ${thaiDate(v.payment_date||v.voucher_date)}</div>
         <div><b>เลขที่ใบวางบิล:</b> ${v.billing_note_no||'-'}</div>
       </div>
 
@@ -1961,7 +2061,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     );
     const rowAmount=(active)=>active ? money(base) : '';
     const rowTax=(active)=>active ? money(v.withholding_tax) : '';
-    const rowDate=(active)=>active ? thaiDate(v.voucher_date) : '';
+    const rowDate=(active)=>active ? thaiDate(v.payment_date||v.voucher_date) : '';
     const taxBoxes=(value)=>String(value||'').replace(/\D/g,'').padEnd(13,' ').slice(0,13).split('').map((d)=>`<span class="tax-box">${d===' '?'':d}</span>`).join('');
     const taxAmountText=thaiBahtText(v.withholding_tax);
 
@@ -2071,7 +2171,7 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         <div class="cert-box">
           <div>ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ</div>
           <div class="cert-sign">ลงชื่อ ............................................................ ผู้จ่ายเงิน</div>
-          <div class="cert-date">........../........../..........</div>
+          <div class="cert-date">${thaiDate(v.wht_issue_date||v.payment_date||v.voucher_date)}</div>
           <div>(วัน เดือน ปี ที่ออกหนังสือรับรองฯ)</div>
           <div class="stamp">ประทับตรา<br>นิติบุคคล<br>(ถ้ามี)</div>
         </div>
@@ -2151,10 +2251,11 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
       <tbody>{rows.length===0&&<tr><td colSpan="8" className="empty">ยังไม่มีรายการ</td></tr>}
       {rows.map((v)=><tr key={v.id}><td className="mono">{mode==='wht'?(v.wht_certificate_no||'-'):mode==='cheque'?(v.cheque_no||'-'):v.voucher_no}</td>
         <td>{thaiDate(v.voucher_date)}</td><td>{v.payee_name}</td><td className="amount">{money(v.gross_amount)}</td><td className="amount">{money(v.withholding_tax)}</td><td className="amount">{money(v.net_amount)}</td><td>{v.payment_method||'-'}</td>
-        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?setPreviewCheque({...v,cheque_payee_name:vendors.find((x)=>x.id===v.vendor_id)?.cheque_payee_name||null}):printVoucher(v)}>{mode==='cheque'?'Preview':'พิมพ์'}</button>{mode==='voucher'&&<button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button>}</div></td></tr>)}</tbody>
+        <td><div className="row-actions"><button className="mini ghost" onClick={()=>mode==='wht'?printWht(v):mode==='cheque'?setPreviewCheque({...v,cheque_payee_name:vendors.find((x)=>x.id===v.vendor_id)?.cheque_payee_name||null}):printVoucher(v)}>{mode==='cheque'?'Preview':'พิมพ์'}</button>{mode==='voucher'&&<><button className="mini ghost" onClick={()=>setEditingVoucher(v)}>แก้ไข PV</button><button className="mini ghost" onClick={()=>setEditingPayment(v)}>แก้ไขการจ่าย</button></>}</div></td></tr>)}</tbody>
     </table></div>
     {showCreate&&<PaymentVoucherModal project={project} expenses={expenses} vendors={vendors} vouchers={vouchers} onClose={()=>setShowCreate(false)} onSaved={async()=>{setShowCreate(false);await load();await onUpdated();}} />}
     {editingPayment&&<PaymentEditModal voucher={editingPayment} onClose={()=>setEditingPayment(null)} onSaved={async()=>{setEditingPayment(null);await load();await onUpdated();}} />}
+    {editingVoucher&&<PaymentAdjustmentModal voucher={editingVoucher} expenses={expenses} vouchers={vouchers} onClose={()=>setEditingVoucher(null)} onSaved={async()=>{setEditingVoucher(null);await load();await onUpdated();}} />}
     {previewCheque&&<ChequePreviewModal voucher={previewCheque} onClose={()=>setPreviewCheque(null)} />}
   </section>;
 }
@@ -2696,7 +2797,7 @@ function App() {
       acc.total += total;
       acc.wht += wht;
       acc.paid += paid;
-      acc.outstanding += Math.max(total - wht - paid, 0);
+      acc.outstanding += Math.max(total - Number(e.canceled_amount||0) - wht - paid, 0);
       return acc;
     }, { total: 0, wht: 0, paid: 0, outstanding: 0 }), [expenses]);
 
