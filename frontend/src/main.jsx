@@ -2085,27 +2085,27 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
     printDocument(v.wht_certificate_no||'50 ทวิ',
       `<style>
         @page{size:A4 portrait;margin:7mm}
-        .wht-standard{box-sizing:border-box;width:196mm;height:283mm;margin:0 auto;padding:2.2mm;border:1px solid #000;break-inside:avoid;break-after:page;color:#000;font-family:Arial,"Noto Sans Thai",sans-serif;font-size:9.5px;line-height:1.25;display:flex;flex-direction:column}
+        .wht-standard{box-sizing:border-box;width:196mm;height:283mm;margin:0 auto;padding:2.2mm;border:1px solid #000;break-inside:avoid;break-after:page;color:#000;font-family:Arial,"Noto Sans Thai",sans-serif;font-size:10.4px;line-height:1.25;display:flex;flex-direction:column}
         .wht-standard *{box-sizing:border-box}
-        .wht-copy-lines{font-size:8.7px;line-height:1.2;margin:0 0 1mm 1mm}
+        .wht-copy-lines{font-size:9.4px;line-height:1.2;margin:0 0 1mm 1mm}
         .wht-head{position:relative;min-height:15mm;border:1px solid #000;border-bottom:0}
         .wht-head-center{text-align:center;padding-top:2.2mm}
-        .wht-main-title{font-size:18px;font-weight:800;line-height:1.1}
-        .wht-sub-title{font-size:10.5px;font-weight:700;margin-top:1mm}
-        .wht-head-meta{position:absolute;right:2.5mm;top:2mm;display:grid;gap:1.2mm;font-size:8.8px}
+        .wht-main-title{font-size:19px;font-weight:800;line-height:1.1}
+        .wht-sub-title{font-size:11.5px;font-weight:700;margin-top:1mm}
+        .wht-head-meta{position:absolute;right:2.5mm;top:2mm;display:grid;gap:1.2mm;font-size:9.5px}
         .fill-line{display:inline-block;min-width:24mm;border-bottom:1px dotted #555;text-align:center;padding:0 .5mm}
         .fill-line.strong{font-weight:700}
         .party-box{border:1px solid #000;border-bottom:0;padding:1.8mm 2mm}
         .party-top{display:flex;justify-content:space-between;align-items:center;gap:2mm;min-height:7mm}
-        .tax-id-row{display:flex;align-items:center;gap:1.3mm;font-size:8.4px;white-space:nowrap}
+        .tax-id-row{display:flex;align-items:center;gap:1.3mm;font-size:9px;white-space:nowrap}
         .tax-boxes{display:inline-flex}
-        .tax-box{width:4.2mm;height:5.2mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:10px}
+        .tax-box{width:4.2mm;height:5.2mm;border:1px solid #000;border-right:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:10.5px}
         .tax-box:last-child{border-right:1px solid #000}
         .party-field{display:grid;grid-template-columns:10mm 1fr;align-items:center;min-height:6.7mm;border-top:1px dotted #777}
         .party-field span{font-weight:700}
-        .party-field b{font-size:10px}
-        .wht-ref{border:1px solid #000;padding:1.5mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:1mm 3.5mm;font-size:8.5px;min-height:8.5mm}
-        .wht-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9.1px;line-height:1.25}
+        .party-field b{font-size:11px}
+        .wht-ref{border:1px solid #000;padding:1.5mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:1mm 3.5mm;font-size:9.2px;min-height:8.5mm}
+        .wht-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;line-height:1.22}
         .wht-table th,.wht-table td{border:1px solid #000;padding:1.7mm 1.6mm;vertical-align:top}
         .wht-table th{text-align:center;font-weight:700}
         .wht-table th:nth-child(1){width:54%}.wht-table th:nth-child(2){width:16%}.wht-table th:nth-child(3),.wht-table th:nth-child(4){width:15%}
@@ -2119,15 +2119,15 @@ function PaymentDocumentsPanel({ mode, project, expenses, vendors, onUpdated }) 
         .active-income td{font-weight:700}
         .wht-total td{height:8mm;vertical-align:middle!important}
         .wht-words td{height:8mm;vertical-align:middle!important}
-        .wht-funds{border:1px solid #000;border-top:0;padding:1.5mm 2mm;font-size:8px;min-height:7mm}
-        .wht-payer{border:1px solid #000;border-top:0;padding:1.5mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:1mm 4mm;font-size:8.5px;min-height:7.5mm}
+        .wht-funds{border:1px solid #000;border-top:0;padding:1.5mm 2mm;font-size:8.8px;min-height:7mm}
+        .wht-payer{border:1px solid #000;border-top:0;padding:1.5mm 2mm;display:flex;align-items:center;flex-wrap:wrap;gap:1mm 4mm;font-size:9.3px;min-height:7.5mm}
         .wht-bottom{margin-top:auto;display:grid;grid-template-columns:42% 58%;border:1px solid #000;min-height:33mm}
-        .warning-box{padding:2.2mm;border-right:1px solid #000;font-size:8px;line-height:1.3}
-        .cert-box{position:relative;padding:2.2mm;text-align:center;font-size:8.2px}
+        .warning-box{padding:2.2mm;border-right:1px solid #000;font-size:8.8px;line-height:1.3}
+        .cert-box{position:relative;padding:2.2mm;text-align:center;font-size:9px}
         .cert-sign{margin-top:11mm}
         .cert-date{margin-top:2mm}
-        .stamp{position:absolute;left:4mm;bottom:3mm;border:1px solid #000;border-radius:50%;width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6.8px}
-        .wht-notes{font-size:7.5px;line-height:1.25;padding:1mm 1mm 0}
+        .stamp{position:absolute;left:4mm;bottom:3mm;border:1px solid #000;border-radius:50%;width:17mm;height:17mm;display:flex;align-items:center;justify-content:center;text-align:center;font-size:7.4px}
+        .wht-notes{font-size:8.2px;line-height:1.25;padding:1mm 1mm 0}
         @media print{.wht-standard:last-child{break-after:auto}}
       </style>` +
       copy(1,'สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี') +
