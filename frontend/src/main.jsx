@@ -2178,6 +2178,7 @@ function PurchaseOrderPanel({ vendors }) {
     vat_rate:'0',
   });
   const [items,setItems]=useState([{description:'',unit:'',qty:'1',unit_price:''}]);
+  const [poStarted,setPoStarted]=useState(false);
 
   useEffect(()=>{ api('/company-profile').then(setCompany).catch(()=>setCompany(null)); },[]);
 
@@ -2192,6 +2193,10 @@ function PurchaseOrderPanel({ vendors }) {
   }
 
   function newPo() {
+    if (poStarted) {
+      const confirmed=window.confirm('เริ่มใบสั่งซื้อใหม่?\n\nข้อมูลที่กำลังกรอกอยู่จะถูกล้าง และระบบจะออกเลข PO ใหม่');
+      if (!confirmed) return;
+    }
     setForm({
       po_no:nextPoNo(),
       po_date:today(),
@@ -2206,9 +2211,8 @@ function PurchaseOrderPanel({ vendors }) {
       vat_rate:'0',
     });
     setItems([{description:'',unit:'',qty:'1',unit_price:''}]);
+    setPoStarted(true);
   }
-
-  useEffect(()=>{ if(!form.po_no) newPo(); },[]);
 
   function set(k,v){ setForm((x)=>({...x,[k]:v})); }
 
@@ -2361,6 +2365,14 @@ function PurchaseOrderPanel({ vendors }) {
       <button className="section-add" onClick={newPo}>+ New</button>
     </div>
 
+    {!poStarted ? (
+      <div className="empty-state" style={{marginTop:'18px',padding:'32px 20px'}}>
+        <strong>ยังไม่ได้เริ่มใบสั่งซื้อ</strong>
+        <span>กด New เมื่อต้องการออก PO จริง ระบบจะสร้างเลขที่ PO ตอนนั้นเท่านั้น</span>
+        <button className="section-add" onClick={newPo}>+ New ใบสั่งซื้อ</button>
+      </div>
+    ) : (
+    <>
     <div className="form-grid">
       <label>เลขที่ PO<input value={form.po_no} readOnly /></label>
       <label>วันที่ PO<input type="date" value={form.po_date} onChange={(e)=>set('po_date',e.target.value)} /></label>
@@ -2405,6 +2417,8 @@ function PurchaseOrderPanel({ vendors }) {
 
     <label style={{display:'block',marginTop:'12px'}}>หมายเหตุ<textarea rows="3" value={form.remark} onChange={(e)=>set('remark',e.target.value)} /></label>
     <div className="actions" style={{marginTop:'14px'}}><button onClick={printPo}>พิมพ์ / Print PO</button></div>
+    </>
+    )}
   </section>;
 }
 
