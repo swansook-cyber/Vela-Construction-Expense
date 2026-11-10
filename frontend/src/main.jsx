@@ -2486,6 +2486,152 @@ function App() {
 
   useEffect(() => { loadBase(); }, []);
 
+  async function printExpenseRecord(expense) {
+    try {
+      setError('');
+      const [company, voucherRows] = await Promise.all([
+        api('/company-profile'),
+        project?.id ? api(`/payment-vouchers?project_id=${project.id}`) : Promise.resolve([]),
+      ]);
+      const vendor = vendors.find((v) => String(v.id) === String(expense.vendor_id));
+      const costCode = costCodes.find((c) => String(c.id) === String(expense.cost_code_id));
+      const linkedVoucher = voucherRows.find((v) => {
+        const ids = v.expense_ids?.length ? v.expense_ids : (v.expense_id ? [v.expense_id] : []);
+        return ids.some((id) => String(id) === String(expense.id));
+      });
+      const statusLabel = ({UNPAID:'ยังไม่จ่าย',PARTIAL:'จ่ายบางส่วน',PAID:'จ่ายแล้ว',VOID:'ยกเลิก'})[expense.payment_status] || expense.payment_status || '-';
+      const methodLabel = ({TRANSFER:'โอนเงิน',CASH:'เงินสด',CHEQUE:'เช็ค',CREDIT:'เครดิต / เจ้าหนี้'})[expense.payment_method] || expense.payment_method || '-';
+      const logoUrl = `${window.location.origin}/sea-mountain-adventure-logo.png`;
+      const netPayable = Math.max(Number(expense.total_amount||0) - Number(expense.withholding_tax||0), 0);
+
+      printDocument(expense.expense_no || 'Expense Record', `<style>
+        @page{size:A4 portrait;margin:8mm}
+        html,body{margin:0;padding:0}
+        body{font-family:Arial,"Noto Sans Thai",sans-serif;color:#111}
+        .er-page{box-sizing:border-box;width:194mm;height:281mm;border:1px solid #222;padding:7mm;display:flex;flex-direction:column;font-size:10px;line-height:1.35}
+        .er-page *{box-sizing:border-box}
+        .er-head{display:grid;grid-template-columns:38mm 1fr 52mm;gap:4mm;align-items:start;border-bottom:1.4px solid #111;padding-bottom:4mm}
+        .er-logo{width:35mm;height:27mm;object-fit:contain}
+        .er-company{font-size:8.8px;line-height:1.32}.er-company b{font-size:11px}
+        .er-title{text-align:center;padding-top:1mm}.er-title h1{font-size:21px;line-height:1.05;margin:0}.er-title b{font-size:10px}
+        .er-meta{display:grid;grid-template-columns:auto 1fr;gap:2mm 3mm;align-items:center;padding-top:2mm}
+        .er-meta span{font-weight:700}.er-meta b{border-bottom:1px solid #111;text-align:right;padding:0 1mm 1mm}
+        .er-info{margin-top:4mm;border:1px solid #111}
+        .er-info .row{display:grid;grid-template-columns:35mm 1fr 35mm 1fr;border-bottom:1px solid #bbb}
+        .er-info .row:last-child{border-bottom:0}
+        .er-info .cell{padding:2.3mm 3mm}.er-info .label{font-weight:700;background:#f4f4f4;border-right:1px solid #bbb}
+        .er-info .cell:nth-child(2){border-right:1px solid #bbb}
+        .er-table{width:100%;border-collapse:collapse;margin-top:4mm;table-layout:fixed}
+        .er-table th,.er-table td{border:1px solid #111;padding:3mm 2.5mm;vertical-align:top}
+        .er-table th{background:#f1f1f1;text-align:center;font-size:9px}
+        .er-table .num{text-align:right;white-space:nowrap}
+        .er-summary{width:50%;margin:4mm 0 0 auto;border-collapse:collapse}
+        .er-summary td{border:1px solid #111;padding:2.5mm 3mm}.er-summary td:last-child{text-align:right;font-weight:700}
+        .er-summary tr:last-child td{font-size:10.5px;font-weight:800}
+        .er-docs{margin-top:5mm;border:1px solid #111}
+        .er-docs .head{background:#f1f1f1;padding:2mm 3mm;font-weight:800}
+        .er-docs .body{padding:3mm;display:flex;gap:5mm;flex-wrap:wrap}
+        .er-docs .attached{margin-left:auto;font-weight:700}
+        .er-bottom{margin-top:auto}
+        .er-remark{border:1px solid #111;min-height:26mm}
+        .er-remark .head{background:#f1f1f1;padding:2mm 3mm;font-weight:800}
+        .er-remark .body{padding:3mm;white-space:pre-wrap}
+        .er-sign{display:grid;grid-template-columns:1fr 1fr;border:1px solid #111;border-right:0;margin-top:4mm}
+        .er-sign>div{border-right:1px solid #111;min-height:30mm;text-align:center;padding:3mm;display:flex;flex-direction:column;justify-content:flex-end;gap:3mm}
+        .er-foot{display:flex;justify-content:space-between;margin-top:2mm;padding-top:1.5mm;border-top:1px solid #888;font-size:8px;color:#444}
+      </style>
+      <div class="er-page">
+        <div class="er-head">
+          <img class="er-logo" src="${logoUrl}" alt="Sea Mountain logo">
+          <div class="er-company">
+            <b>${company?.legal_name||'Sea Mountain'}</b><br>
+            ${company?.address||''}<br>
+            เลขประจำตัวผู้เสียภาษี ${company?.tax_id||'-'}<br>
+            โทร. ${company?.phone||'-'}
+          </div>
+          <div class="er-meta">
+            <span>เลขที่</span><b>${expense.expense_no||'-'}</b>
+            <span>วันที่</span><b>${thaiDate(expense.expense_date)}</b>
+          </div>
+        </div>
+        <div class="er-title"><h1>ใบบันทึกค่าใช้จ่าย</h1><b>EXPENSE RECORD</b></div>
+
+        <div class="er-info">
+          <div class="row">
+            <div class="cell label">ผู้ขาย / Vendor</div><div class="cell"><b>${vendor?.name||'-'}</b></div>
+            <div class="cell label">Tax ID</div><div class="cell">${vendor?.tax_id||'-'}</div>
+          </div>
+          <div class="row">
+            <div class="cell label">ที่อยู่</div><div class="cell">${vendor?.address||'-'}</div>
+            <div class="cell label">โทรศัพท์</div><div class="cell">${vendor?.phone||'-'}</div>
+          </div>
+          <div class="row">
+            <div class="cell label">Cost Code</div><div class="cell">${costCode ? `${costCode.code} — ${costCode.name}` : '-'}</div>
+            <div class="cell label">เลขที่เอกสาร</div><div class="cell">${expense.document_no||'-'}</div>
+          </div>
+          <div class="row">
+            <div class="cell label">สถานะจ่าย</div><div class="cell">${statusLabel}</div>
+            <div class="cell label">วิธีจ่าย</div><div class="cell">${methodLabel}</div>
+          </div>
+          <div class="row">
+            <div class="cell label">PV No.</div><div class="cell">${linkedVoucher?.voucher_no||'-'}</div>
+            <div class="cell label">WHT No.</div><div class="cell">${linkedVoucher?.wht_certificate_no||'-'}</div>
+          </div>
+        </div>
+
+        <table class="er-table">
+          <thead><tr>
+            <th>รายละเอียด / Description</th>
+            <th style="width:18%">Subtotal</th>
+            <th style="width:14%">VAT</th>
+            <th style="width:14%">WHT</th>
+            <th style="width:18%">Total</th>
+          </tr></thead>
+          <tbody><tr>
+            <td>${expense.description||'-'}</td>
+            <td class="num">${money(expense.subtotal)}</td>
+            <td class="num">${money(expense.vat_amount)}</td>
+            <td class="num">${money(expense.withholding_tax)}</td>
+            <td class="num"><b>${money(expense.total_amount)}</b></td>
+          </tr></tbody>
+        </table>
+
+        <table class="er-summary">
+          <tr><td>ยอดตามเอกสาร</td><td>${money(expense.total_amount)}</td></tr>
+          <tr><td>หัก ณ ที่จ่าย</td><td>- ${money(expense.withholding_tax)}</td></tr>
+          <tr><td>ยอดจ่ายสุทธิ / Net Payable</td><td>${money(netPayable)}</td></tr>
+        </table>
+
+        <div class="er-docs">
+          <div class="head">เอกสารแนบ / Supporting Documents</div>
+          <div class="body">
+            <span>□ ใบเสร็จรับเงิน</span>
+            <span>□ ใบกำกับภาษี</span>
+            <span>□ ใบแจ้งหนี้</span>
+            <span>□ ใบส่งของ</span>
+            <span>□ ใบวางบิล</span>
+            <span>□ อื่น ๆ</span>
+            <span class="attached">${expense.paperless_document_id ? `แนบในระบบ: DOC #${expense.paperless_document_id}` : 'ยังไม่มีเอกสารในระบบ'}</span>
+          </div>
+        </div>
+
+        <div class="er-bottom">
+          <div class="er-remark">
+            <div class="head">หมายเหตุ / Remark</div>
+            <div class="body">${expense.notes||'-'}</div>
+          </div>
+          <div class="er-sign">
+            <div><b>ผู้บันทึก / Processed By</b><div>........................................................</div><div>วันที่ ........../........../..........</div></div>
+            <div><b>ผู้ตรวจสอบ / Checked By</b><div>........................................................</div><div>วันที่ ........../........../..........</div></div>
+          </div>
+          <div class="er-foot"><span>${company?.legal_name||'Sea Mountain'}</span><span>${expense.expense_no||''}</span></div>
+        </div>
+      </div>`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function voidExpense(expense) {
     if (expense.payment_status !== 'UNPAID' || Number(expense.net_paid || 0) > 0) {
       setError('รายการที่มีการจ่ายแล้วต้องไม่ยกเลิกจากทะเบียนค่าใช้จ่าย');
@@ -2649,6 +2795,7 @@ function App() {
                       <div className="row-actions">
                         <button className="mini ghost" title="แก้ไข" aria-label={`แก้ไข ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => setEditingExpense(e)}><span aria-hidden="true">✎</span><span className="action-label">แก้ไข</span></button>
                         <button className="mini ghost" title={e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'} aria-label={`${e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'} ${e.expense_no}`} disabled={e.payment_status === 'VOID'} onClick={() => setAttachingExpense(e)}><span aria-hidden="true">▣</span><span className="action-label">{e.paperless_document_id ? 'เปลี่ยนเอกสาร' : 'แนบเอกสาร'}</span></button>
+                        <button className="mini ghost" title="พิมพ์ใบบันทึกค่าใช้จ่าย" aria-label={`พิมพ์ใบบันทึกค่าใช้จ่าย ${e.expense_no}`} onClick={() => printExpenseRecord(e)}><span aria-hidden="true">▤</span><span className="action-label">พิมพ์</span></button>
                         <button className="mini danger" title={e.payment_status==='UNPAID'?'ยกเลิก':'มีการจ่ายแล้ว — ยกเลิกไม่ได้'} aria-label={`ยกเลิก ${e.expense_no}`} disabled={e.payment_status !== 'UNPAID' || Number(e.net_paid || 0) > 0} onClick={() => voidExpense(e)}><span aria-hidden="true">×</span><span className="action-label">ยกเลิก</span></button>
                       </div>
                     </td>
