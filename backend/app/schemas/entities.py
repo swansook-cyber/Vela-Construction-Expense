@@ -186,6 +186,7 @@ class PaymentVoucherOut(PaymentVoucherCreate):
 
 class PaymentVoucherPaymentUpdate(BaseModel):
     payment_method: str
+    payee_name: str | None = Field(default=None, min_length=1, max_length=255)
     cheque_no: str | None = None
     cheque_date: date | None = None
     bank_name: str | None = None
