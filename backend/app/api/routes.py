@@ -557,10 +557,13 @@ def update_payment_voucher_payment(voucher_id: int, payload: PaymentVoucherPayme
     if payload.payment_method == "CHEQUE" and (not payload.bank_name or not payload.cheque_no or not payload.cheque_date):
         raise HTTPException(status_code=400, detail="Cheque payment requires bank name, cheque number and cheque date")
 
-    old = {"payment_method": voucher.payment_method, "cheque_no": voucher.cheque_no,
-           "cheque_date": voucher.cheque_date, "bank_name": voucher.bank_name,
-           "billing_note_no": voucher.billing_note_no, "notes": voucher.notes}
+    old = {"payment_method": voucher.payment_method, "payee_name": voucher.payee_name,
+           "cheque_no": voucher.cheque_no, "cheque_date": voucher.cheque_date,
+           "bank_name": voucher.bank_name, "billing_note_no": voucher.billing_note_no,
+           "notes": voucher.notes}
     voucher.payment_method = payload.payment_method
+    if payload.payee_name is not None:
+        voucher.payee_name = payload.payee_name.strip()
     voucher.cheque_no = payload.cheque_no if payload.payment_method == "CHEQUE" else None
     voucher.cheque_date = payload.cheque_date if payload.payment_method == "CHEQUE" else None
     voucher.bank_name = payload.bank_name if payload.payment_method == "CHEQUE" else None
@@ -569,9 +572,10 @@ def update_payment_voucher_payment(voucher_id: int, payload: PaymentVoucherPayme
     voucher.updated_at = datetime.utcnow()
     add_audit(db, "payment_voucher", voucher.id, "UPDATE_PAYMENT", {
         "old": old,
-        "new": {"payment_method": voucher.payment_method, "cheque_no": voucher.cheque_no,
-                "cheque_date": voucher.cheque_date, "bank_name": voucher.bank_name,
-                "billing_note_no": voucher.billing_note_no, "notes": voucher.notes},
+        "new": {"payment_method": voucher.payment_method, "payee_name": voucher.payee_name,
+                "cheque_no": voucher.cheque_no, "cheque_date": voucher.cheque_date,
+                "bank_name": voucher.bank_name, "billing_note_no": voucher.billing_note_no,
+                "notes": voucher.notes},
         "reason": payload.reason.strip(),
     })
     db.commit()
