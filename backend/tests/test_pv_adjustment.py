@@ -195,6 +195,36 @@ def test_cheque_payment_and_wht_dates_remain_independent_with_audit(context):
         assert json.loads(logs[1].details)["old"]["cheque_date"] == "2026-11-20"
 
 
+def test_post_payment_payee_correction_preserves_amounts_and_document_numbers(context):
+    client, sessions = context
+    seed_expense(sessions, 1)
+    voucher = create_voucher(client, [{"expense_id": 1, "gross_amount": "1000.00", "withholding_tax": "30.00"}])
+    result = client.put(f"/api/v1/payment-vouchers/{voucher['id']}/payment", json={
+        "payment_method": "TRANSFER",
+        "payee_name": "บริษัท ชื่อสำหรับหักภาษี จำกัด",
+        "reason": "ร้านค้าแจ้งชื่อสำหรับหนังสือรับรองหัก ณ ที่จ่ายภายหลังชำระเงิน",
+    })
+    assert result.status_code == 200, result.text
+    revised = result.json()
+    assert revised["payee_name"] == "บริษัท ชื่อสำหรับหักภาษี จำกัด"
+    assert revised["voucher_no"] == voucher["voucher_no"]
+    assert revised["wht_certificate_no"] == voucher["wht_certificate_no"]
+    assert Decimal(revised["gross_amount"]) == Decimal(voucher["gross_amount"])
+    assert Decimal(revised["withholding_tax"]) == Decimal(voucher["withholding_tax"])
+    assert Decimal(revised["net_amount"]) == Decimal(voucher["net_amount"])
+    with sessions() as db:
+        saved = db.get(PaymentVoucher, voucher["id"])
+        assert saved.payee_name == "บริษัท ชื่อสำหรับหักภาษี จำกัด"
+        audit = db.scalar(select(AuditLog).where(
+            AuditLog.entity_id == voucher["id"],
+            AuditLog.action == "UPDATE_PAYMENT",
+        ))
+        details = json.loads(audit.details)
+        assert details["old"]["payee_name"] == "Vendor A"
+        assert details["new"]["payee_name"] == "บริษัท ชื่อสำหรับหักภาษี จำกัด"
+        assert "ร้านค้าแจ้งชื่อ" in details["reason"]
+
+
 def test_wht_reduction_keeps_certificate_number_and_reconciles_expense(context):
     client, sessions = context
     seed_expense(sessions, 1)
