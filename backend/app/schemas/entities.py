@@ -35,6 +35,7 @@ class CostCodeOut(BaseModel):
 
 class VendorCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    cheque_payee_name: str | None = Field(default=None, max_length=255)
     entity_type: str = "UNKNOWN"
     tax_id: str | None = None
     phone: str | None = None
@@ -61,6 +62,7 @@ class ExpenseCreate(BaseModel):
     subtotal: Decimal = Decimal("0")
     vat_amount: Decimal = Decimal("0")
     withholding_tax: Decimal = Decimal("0")
+    default_wht_rate: Decimal | None = None
     total_amount: Decimal = Decimal("0")
     net_paid: Decimal = Decimal("0")
     payment_status: str = "UNPAID"
@@ -77,6 +79,7 @@ class ExpenseOut(ExpenseCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
     expense_no: str
+    canceled_amount: Decimal = Decimal("0")
     document_task_id: str | None = None
     void_reason: str | None = None
     voided_at: datetime | None = None
@@ -96,6 +99,8 @@ class DashboardSummary(BaseModel):
     project_id: int
     project_name: str
     total_expenses: Decimal
+    canceled_amount: Decimal
+    accepted_expenses: Decimal
     paid_amount: Decimal
     withholding_tax: Decimal
     outstanding_amount: Decimal
@@ -112,6 +117,8 @@ class CostCodeSummary(BaseModel):
     vat_amount: Decimal
     withholding_tax: Decimal
     total_amount: Decimal
+    canceled_amount: Decimal
+    accepted_amount: Decimal
     vendor_payable: Decimal
     paid_amount: Decimal
     outstanding_amount: Decimal
@@ -128,11 +135,28 @@ class AuditLogOut(BaseModel):
     created_at: datetime
 
 
+class PaymentVoucherAllocation(BaseModel):
+    expense_id: int
+    gross_amount: Decimal
+    withholding_tax: Decimal = Decimal("0")
+
+
+class PaymentVoucherAllocationOut(PaymentVoucherAllocation):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    net_amount: Decimal
+    canceled_amount: Decimal = Decimal("0")
+
+
 class PaymentVoucherCreate(BaseModel):
     project_id: int
-    expense_id: int
+    expense_id: int | None = None
+    expense_ids: list[int] = Field(default_factory=list)
+    allocations: list[PaymentVoucherAllocation] = Field(default_factory=list)
     vendor_id: int | None = None
     voucher_date: date
+    payment_date: date | None = None
+    wht_issue_date: date | None = None
     gross_amount: Decimal
     withholding_tax: Decimal = Decimal("0")
     wht_rate: Decimal | None = None
@@ -143,14 +167,18 @@ class PaymentVoucherCreate(BaseModel):
     cheque_no: str | None = None
     cheque_date: date | None = None
     bank_name: str | None = None
+    billing_note_no: str | None = Field(default=None, max_length=120)
     notes: str | None = None
 
 
 class PaymentVoucherOut(PaymentVoucherCreate):
     model_config = ConfigDict(from_attributes=True)
+    allocations: list[PaymentVoucherAllocationOut] = Field(default_factory=list)
     id: int
     voucher_no: str
     wht_certificate_no: str | None = None
+    canceled_amount: Decimal = Decimal("0")
+    adjustment_reason: str | None = None
     status: str
     created_at: datetime
     updated_at: datetime
@@ -158,7 +186,24 @@ class PaymentVoucherOut(PaymentVoucherCreate):
 
 class PaymentVoucherPaymentUpdate(BaseModel):
     payment_method: str
+    payee_name: str | None = Field(default=None, min_length=1, max_length=255)
     cheque_no: str | None = None
     cheque_date: date | None = None
     bank_name: str | None = None
+    billing_note_no: str | None = Field(default=None, max_length=120)
     notes: str | None = None
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class PaymentVoucherAdjustmentAllocation(BaseModel):
+    expense_id: int
+    gross_amount: Decimal
+    withholding_tax: Decimal = Decimal("0")
+    canceled_amount: Decimal = Decimal("0")
+
+
+class PaymentVoucherAdjustment(BaseModel):
+    allocations: list[PaymentVoucherAdjustmentAllocation] = Field(min_length=1)
+    payment_date: date
+    wht_issue_date: date | None = None
+    reason: str = Field(min_length=3, max_length=1000)

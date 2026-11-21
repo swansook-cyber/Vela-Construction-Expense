@@ -46,6 +46,7 @@ class Vendor(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), index=True)
+    cheque_payee_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     entity_type: Mapped[str] = mapped_column(String(30), default="UNKNOWN")
     tax_id: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -68,7 +69,9 @@ class Expense(Base):
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     vat_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    default_wht_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    canceled_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     net_paid: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     payment_status: Mapped[str] = mapped_column(String(30), default="UNPAID")
     payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -87,18 +90,19 @@ class Expense(Base):
 
 class PaymentVoucher(Base):
     __tablename__ = "payment_vouchers"
-    __table_args__ = (
-        UniqueConstraint("voucher_no", name="uq_payment_voucher_no"),
-        UniqueConstraint("expense_id", name="uq_payment_voucher_expense"),
-    )
+    __table_args__ = (UniqueConstraint("voucher_no", name="uq_payment_voucher_no"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     voucher_no: Mapped[str] = mapped_column(String(40), index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    expense_id: Mapped[int] = mapped_column(ForeignKey("expenses.id"), index=True)
+    expense_id: Mapped[int | None] = mapped_column(ForeignKey("expenses.id"), nullable=True, index=True)
     vendor_id: Mapped[int | None] = mapped_column(ForeignKey("vendors.id"), nullable=True, index=True)
     voucher_date: Mapped[date] = mapped_column(Date)
+    payment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    wht_issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    canceled_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    adjustment_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     wht_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     income_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -109,6 +113,7 @@ class PaymentVoucher(Base):
     cheque_no: Mapped[str | None] = mapped_column(String(80), nullable=True)
     cheque_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     bank_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    billing_note_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="ISSUED")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -117,6 +122,33 @@ class PaymentVoucher(Base):
     project = relationship("Project")
     expense = relationship("Expense")
     vendor = relationship("Vendor")
+    items = relationship("PaymentVoucherItem", back_populates="voucher", cascade="all, delete-orphan", order_by="PaymentVoucherItem.id")
+
+    @property
+    def expense_ids(self) -> list[int]:
+        if self.items:
+            return [item.expense_id for item in self.items]
+        return [self.expense_id] if self.expense_id is not None else []
+
+    @property
+    def allocations(self):
+        return self.items
+
+
+class PaymentVoucherItem(Base):
+    __tablename__ = "payment_voucher_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    voucher_id: Mapped[int] = mapped_column(ForeignKey("payment_vouchers.id", ondelete="CASCADE"), index=True)
+    expense_id: Mapped[int] = mapped_column(ForeignKey("expenses.id"), index=True)
+    gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    canceled_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    withholding_tax: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    net_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    voucher = relationship("PaymentVoucher", back_populates="items")
+    expense = relationship("Expense")
 
 
 class AuditLog(Base):
