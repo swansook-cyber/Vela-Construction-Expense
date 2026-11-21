@@ -1067,7 +1067,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
       rows = whtRows.map((r) => [
         thaiDate(r.voucher.payment_date || r.voucher.voucher_date),
         String(r.voucher.wht_certificate_no || '').trim(),
-        String(r.vendor?.name || r.voucher.payee_name || '').trim(),
+        String(r.voucher.payee_name || r.vendor?.name || '').trim(),
         String(r.vendor?.tax_id || '').trim(),
         String(r.voucher.income_type || r.expenses?.map((e)=>e.description).join(' / ') || r.expense?.description || '').trim(),
         r.base,
@@ -1365,7 +1365,7 @@ function ReportPanel({ project, expenses, costCodes, vendors }) {
               <thead><tr><th>วันที่จ่าย</th><th>เลขที่ 50 ทวิ</th><th>ผู้รับเงิน</th><th>Tax ID</th><th>ประเภทเงินได้</th><th>ฐานภาษี</th><th>อัตรา</th><th>WHT</th><th>PV</th></tr></thead>
               <tbody>
                 {whtRows.length === 0 && <tr><td colSpan="9" className="empty">ไม่มีรายการหัก ณ ที่จ่ายตามช่วงเวลาที่เลือก</td></tr>}
-                {whtRows.map((r) => <tr key={r.voucher.id}><td>{thaiDate(r.voucher.payment_date || r.voucher.voucher_date)}</td><td>{r.voucher.wht_certificate_no || '-'}</td><td>{r.vendor?.name || r.voucher.payee_name}</td><td className="mono">{r.vendor?.tax_id || '-'}</td><td>{r.voucher.income_type || r.expense?.description || '-'}</td><td className="amount">{money(r.base)}</td><td className="amount">{r.rate.toFixed(2)}%</td><td className="amount">{money(r.tax)}</td><td>{r.voucher.voucher_no}</td></tr>)}
+                {whtRows.map((r) => <tr key={r.voucher.id}><td>{thaiDate(r.voucher.payment_date || r.voucher.voucher_date)}</td><td>{r.voucher.wht_certificate_no || '-'}</td><td>{r.voucher.payee_name || r.vendor?.name}</td><td className="mono">{r.vendor?.tax_id || '-'}</td><td>{r.voucher.income_type || r.expense?.description || '-'}</td><td className="amount">{money(r.base)}</td><td className="amount">{r.rate.toFixed(2)}%</td><td className="amount">{money(r.tax)}</td><td>{r.voucher.voucher_no}</td></tr>)}
               </tbody>
               {whtRows.length > 0 && <tfoot><tr><th colSpan="5">รวม</th><th className="amount">{money(whtTotals.base)}</th><th></th><th className="amount">{money(whtTotals.tax)}</th><th></th></tr></tfoot>}
             </table>
@@ -1665,6 +1665,7 @@ function PaymentVoucherModal({ project, expenses, vendors, vouchers, onClose, on
 
 function PaymentEditModal({ voucher, onClose, onSaved }) {
   const [form,setForm]=useState({
+    payee_name:voucher.payee_name||'',
     payment_method:voucher.payment_method||'TRANSFER',
     bank_name:voucher.bank_name||'ธนาคารไทยพาณิชย์',
     cheque_no:voucher.cheque_no||'',
@@ -1682,6 +1683,7 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
         method:'PUT',
         body:JSON.stringify({
           payment_method:form.payment_method,
+          payee_name:form.payee_name.trim(),
           bank_name:form.payment_method==='CHEQUE'?(form.bank_name||null):null,
           cheque_no:form.payment_method==='CHEQUE'?(form.cheque_no||null):null,
           cheque_date:form.payment_method==='CHEQUE'?form.cheque_date:null,
@@ -1697,6 +1699,10 @@ function PaymentEditModal({ voucher, onClose, onSaved }) {
     <div className="modal small" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="modal-head"><div><p className="eyebrow">Payment</p><h2>แก้ไขข้อมูลการจ่าย</h2><p>{voucher.voucher_no}</p></div><button className="ghost icon" onClick={onClose}>×</button></div>
       <form className="form-grid" onSubmit={submit}>
+        <div className="wide info-message">ใช้หน้านี้แก้ชื่อผู้รับเงิน/ชื่อผู้ถูกหัก ณ ที่จ่ายย้อนหลังได้ โดยเลข PV ยอดเงิน และเลข 50 ทวิเดิมจะไม่เปลี่ยน</div>
+        <label className="wide">ชื่อผู้รับเงิน / ชื่อผู้ถูกหัก ณ ที่จ่าย
+          <input value={form.payee_name} onChange={(e)=>set('payee_name',e.target.value)} required />
+        </label>
         <label>วิธีจ่าย<select value={form.payment_method} onChange={(e)=>set('payment_method',e.target.value)}>
           <option value="TRANSFER">โอน</option><option value="CASH">เงินสด</option><option value="CHEQUE">เช็ค</option>
         </select></label>
